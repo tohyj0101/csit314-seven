@@ -1,16 +1,30 @@
 name: CI
+
 on:
-  push: { branches: [ main, 'sprint-*' ] }
-  pull_request: { branches: [ main ] }
+  push:
+    branches: [ main, 'sprint-*' ]
+  pull_request:
+    branches: [ main ]
+
 jobs:
   test:
     runs-on: ubuntu-latest
+
     services:
       postgres:
         image: postgres:15
-        env: { POSTGRES_USER: postgres, POSTGRES_PASSWORD: postgres, POSTGRES_DB: csit314_seven_test }
-        ports: [ '5432:5432' ]
-        options: --health-cmd pg_isready --health-interval 10s --health-timeout 5s --health-retries 5
+        env:
+          POSTGRES_USER: postgres
+          POSTGRES_PASSWORD: postgres
+          POSTGRES_DB: csit314_seven_test
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd pg_isready
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+
     env:
       DB_HOST: localhost
       DB_PORT: 5432
@@ -18,11 +32,23 @@ jobs:
       DB_PASSWORD: postgres
       DB_NAME: csit314_seven_test
       SESSION_SECRET: ci-secret
+
     steps:
       - uses: actions/checkout@v4
+
       - uses: actions/setup-node@v4
-        with: { node-version: '20', cache: 'npm' }
-      - run: npm ci
-      - run: PGPASSWORD=postgres psql -h localhost -U postgres -d csit314_seven_test -f db/schema.sql
-      - run: node db/seed.js
-      - run: npm test -- --ci
+        with:
+          node-version: '20'
+          # Removed 'cache: npm' because it requires a package-lock.json file
+
+      - name: Install dependencies
+        run: npm install
+
+      - name: Apply database schema
+        run: PGPASSWORD=postgres psql -h localhost -U postgres -d csit314_seven_test -f db/schema.sql
+
+      - name: Seed database
+        run: node db/seed.js
+
+      - name: Run test suite
+        run: npm test -- --ci
