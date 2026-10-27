@@ -29,6 +29,6 @@ Make sure you have the following installed on your machine:
 ### 1. Installation
 Clone the repository and install the dependencies:
 ```bash
-git clone https://github.com/YOUR-USERNAME/YOUR-REPO-NAME.git
+git clone https://github.com/tohyj0101/csit314-seven.git
 cd csit314-seven
 npm install
