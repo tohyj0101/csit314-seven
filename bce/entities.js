@@ -5,10 +5,37 @@ const U = {
   findById: async id => Q(`SELECT a.account_id, a.username, a.email, a.status, a.profile_id, p.profile_name FROM user_account a JOIN user_profile p ON p.profile_id=a.profile_id WHERE a.account_id=$1`, [id]).then(r => r[0] || null),
   findByEmail: async e => Q(`SELECT a.*, p.profile_name FROM user_account a JOIN user_profile p ON p.profile_id=a.profile_id WHERE a.email=$1`, [e]).then(r => r[0] || null),
   create: async f => Q(`INSERT INTO user_account (profile_id, username, email, password_hash) VALUES ($1,$2,$3,$4) RETURNING account_id, username, email, status, profile_id`, [f.profile_id, f.username, f.email, f.password_hash]).then(r => r[0]),
-  update: async (id, f) => Q(`UPDATE user_account SET username=COALESCE($2,username), email=COALESCE($3,email), profile_id=COALESCE($4,profile_id), updated_at=now() WHERE account_id=$1 RETURNING account_id, username, email, status, profile_id`, [id, f.username||null, f.email||null, f.profile_id||null]).then(r => r[0] || null),
+  update: async (id, f) => {
+    return Q(`
+      UPDATE user_account SET 
+        username=COALESCE($2, username), 
+        email=COALESCE($3, email), 
+        profile_id=COALESCE($4, profile_id), 
+        updated_at=now() 
+      WHERE account_id=$1 
+      RETURNING account_id, username, email, status, profile_id
+    `, [id, f.username || null, f.email || null, f.profile_id || null]).then(r => r[0] || null);
+  },
   setStatus: async (id, s) => Q('UPDATE user_account SET status=$2, updated_at=now() WHERE account_id=$1 RETURNING account_id, username, email, status', [id, s]).then(r => r[0] || null),
   search: async t => Q(`SELECT a.account_id, a.username, a.email, a.status, p.profile_name FROM user_account a JOIN user_profile p ON p.profile_id=a.profile_id WHERE a.username ILIKE $1 OR a.email ILIKE $1 ORDER BY a.account_id LIMIT 100`, ['%'+t+'%']),
   all: async () => Q(`SELECT a.account_id, a.username, a.email, a.status, p.profile_name FROM user_account a JOIN user_profile p ON p.profile_id=a.profile_id ORDER BY a.account_id LIMIT 500`)
+};
+
+const Prof = {
+  create: async f => Q('INSERT INTO user_profile (profile_name, permissions) VALUES ($1, $2) RETURNING *', [f.profile_name, f.permissions]).then(r => r[0]),
+  all: async () => Q('SELECT * FROM user_profile ORDER BY profile_id'),
+  update: async (id, f) => {
+    return Q(`
+      UPDATE user_profile SET 
+        profile_name = COALESCE($2, profile_name), 
+        permissions = COALESCE($3, permissions) 
+      WHERE profile_id = $1 
+      RETURNING *
+    `, [id, f.profile_name || null, f.permissions || null]).then(r => r[0] || null);
+  },
+  findById: async id => Q('SELECT * FROM user_profile WHERE profile_id = $1', [id]).then(r => r[0] || null),
+  setStatus: async (id, s) => Q('UPDATE user_profile SET status=$2 WHERE profile_id=$1 RETURNING *', [id, s]).then(r => r[0] || null),
+  search: async t => Q('SELECT * FROM user_profile WHERE profile_name ILIKE $1 ORDER BY profile_id', ['%'+t+'%'])
 };
 
 const C = {
@@ -57,4 +84,4 @@ const R = {
   }
 };
 
-module.exports = { UserAccount: U, Company: C, Project: P, Favourite: Fv, Category: Cat, Report: R };
+module.exports = { UserAccount: U, UserProfile: Prof, Company: C, Project: P, Favourite: Fv, Category: Cat, Report: R };

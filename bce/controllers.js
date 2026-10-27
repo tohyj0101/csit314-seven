@@ -1,4 +1,4 @@
-const { UserAccount: U, Company: C, Project: P, Favourite: Fv, Category: Cat, Report: R } = require('./entities');
+const { UserAccount: U, UserProfile: Prof, Company: C, Project: P, Favourite: Fv, Category: Cat, Report: R } = require('./entities');
 const { hashPassword, verifyPassword } = require('../config/auth');
 
 const Auth = {
@@ -16,7 +16,6 @@ const Auth = {
     
     req.session.user = { account_id: u.account_id, username: u.username, role: u.profile_name };
     
-    // Force session to save before responding
     req.session.save((err) => {
       if (err) return res.status(500).json({ error: 'Session save failed' });
       res.json({ user: req.session.user });
@@ -24,6 +23,54 @@ const Auth = {
   },
   logout: (req, res) => req.session.destroy(() => res.json({ ok: true })),
   me: (req, res) => req.session && req.session.user ? res.json({ user: req.session.user }) : res.status(401).json({ error: 'Not authenticated' })
+};
+
+const ProfileCtrl = {
+  list: async (req, res) => res.json({ profiles: await Prof.all() }),
+  create: async (req, res) => {
+    const { profile_name, permissions } = req.body;
+    if (!profile_name) return res.status(400).json({ error: 'Profile name required' });
+    try {
+      const p = await Prof.create({ profile_name, permissions: permissions || [] });
+      res.status(201).json({ profile: p });
+    } catch (e) {
+      if (e.code === '23505') return res.status(409).json({ error: 'Profile name already exists' });
+      res.status(500).json({ error: e.message });
+    }
+  },
+  update: async (req, res) => {
+    const id = req.params.id;
+    const { profile_name, permissions } = req.body;
+    if (!profile_name) return res.status(400).json({ error: 'Profile name required' });
+    try {
+      const p = await Prof.update(id, { profile_name, permissions });
+      if (!p) return res.status(404).json({ error: 'Profile not found' });
+      res.json({ profile: p });
+    } catch (e) {
+      if (e.code === '23505') return res.status(409).json({ error: 'Profile name already exists' });
+      res.status(500).json({ error: e.message });
+    }
+  },
+  get: async (req, res) => {
+    const p = await Prof.findById(req.params.id);
+    if (!p) return res.status(404).json({ error: 'Profile not found' });
+    res.json({ profile: p });
+  },
+  search: async (req, res) => {
+    const keyword = req.query.q || '';
+    res.json({ profiles: await Prof.search(keyword) });
+  },
+  suspend: async (req, res) => {
+    const p = await Prof.findById(req.params.id);
+    if (!p) return res.status(404).json({ error: 'Profile not found' });
+    if (p.status === 'Suspended') return res.status(409).json({ error: 'Profile already suspended' });
+    res.json({ profile: await Prof.setStatus(req.params.id, 'Suspended') });
+  },
+  activate: async (req, res) => {
+    const p = await Prof.findById(req.params.id);
+    if (!p) return res.status(404).json({ error: 'Profile not found' });
+    res.json({ profile: await Prof.setStatus(req.params.id, 'Active') });
+  }
 };
 
 const Uc = {
@@ -40,7 +87,10 @@ const Uc = {
     res.status(201).json({ user: await U.create({ profile_id, username, email, password_hash: await hashPassword(password) }) });
   },
   update: async (req, res) => {
-    const u = await U.update(req.params.id, req.body);
+    const id = req.params.id;
+    const fields = req.body;
+    if (fields.email && !fields.email.includes('@')) return res.status(400).json({ error: 'Invalid email format' });
+    const u = await U.update(id, fields);
     if (!u) return res.status(404).json({ error: 'User not found' });
     res.json({ user: u });
   },
@@ -101,6 +151,11 @@ const Pc = {
     if (!c || c.owner_id !== req.session.user.account_id) return res.status(403).json({ error: 'Forbidden' });
     if (!title) return res.status(400).json({ error: 'Title required' });
     res.status(201).json({ project: await P.create({ company_id, title, description, status: status === 'Completed' ? 'Completed' : 'Ongoing', image_url }) });
+  },
+  get: async (req, res) => {
+    const p = await P.findById(req.params.id);
+    if (!p) return res.status(404).json({ error: 'Project not found' });
+    res.json({ project: p });
   },
   listByCompany: async (req, res) => {
     const c = await C.findById(req.params.companyId);
@@ -182,4 +237,4 @@ const Rc = {
   }
 };
 
-module.exports = { Auth, UserAccountCtrl: Uc, CompanyCtrl: Cc, ProjectCtrl: Pc, FavouriteCtrl: Fc, CategoryCtrl: Catc, ReportCtrl: Rc };
+module.exports = { Auth, UserAccountCtrl: Uc, UserProfileCtrl: ProfileCtrl, CompanyCtrl: Cc, ProjectCtrl: Pc, FavouriteCtrl: Fc, CategoryCtrl: Catc, ReportCtrl: Rc };
