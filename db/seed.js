@@ -1,93 +1,81 @@
 const pool = require('../config/db');
 const { hashPassword } = require('../config/auth');
 
-const FIRST = ['Aria','Kai','Mia','Noah','Leah','Ethan','Zoe','Luca','Ivy','Owen'];
-const LAST  = ['Tan','Lim','Wong','Ng','Lee','Chan','Koh','Yeo','Goh','Ong'];
-const CATS  = ['Residential','Commercial','Kitchen','Bathroom','Living Room','Bedroom'];
-const rnd = a => a[Math.floor(Math.random() * a.length)];
-const ri = (a, b) => Math.floor(Math.random() * (b - a + 1)) + a;
-
 (async () => {
   const c = await pool.connect();
   try {
-    console.log('--- STARTING SEED ---');
+    console.log('--- STARTING CLEAN SEED ---');
     await c.query('BEGIN');
     
-    // 1. Profiles
+    // 1. Wipe all existing data cleanly and reset IDs
+    await c.query(`
+      TRUNCATE TABLE 
+        project_view, favourite, project_category, category, project, company, user_account, user_profile 
+      RESTART IDENTITY CASCADE;
+    `);
+    console.log('✅ Database wiped clean');
+
+    // 2. Insert exactly 4 Profiles
     const profiles = [
-      ['User Admin', ['user:manage']],
-      ['Interior Designer', ['company:manage']],
-      ['Customer', ['project:view']],
-      ['Platform Manager', ['category:manage']]
+      ['User Admin', ['user:manage', 'profile:manage']],
+      ['Interior Designer', ['company:manage', 'project:manage', 'interest:view']],
+      ['Customer', ['project:view', 'favourite:manage']],
+      ['Platform Manager', ['category:manage', 'report:generate']]
     ];
-    for (const [name, perms] of profiles) {
-      await c.query('INSERT INTO user_profile (profile_name, permissions) VALUES ($1, $2) ON CONFLICT DO NOTHING', [name, perms]);
-    }
     const pids = {};
-    (await c.query('SELECT profile_id, profile_name FROM user_profile')).rows.forEach(r => pids[r.profile_name] = r.profile_id);
-    
-    // 2. Users
+    for (const [name, perms] of profiles) {
+      const r = await c.query('INSERT INTO user_profile (profile_name, permissions) VALUES ($1, $2) RETURNING profile_id', [name, perms]);
+      pids[name] = r.rows[0].profile_id;
+    }
+
+    // 3. Insert exactly 4 Users (1 per role)
     const hash = await hashPassword('Password123!');
-    for (const role of Object.keys(pids)) {
-      for (let i = 1; i <= 30; i++) {
-        const u = role.toLowerCase().replace(/\s+/g, '.') + '.' + i;
-        await c.query(
-          'INSERT INTO user_account (profile_id, username, email, password_hash) VALUES ($1,$2,$3,$4) ON CONFLICT DO NOTHING',
-          [pids[role], u, u + '@example.test', hash]
-        );
-      }
-    }
-    console.log('✅ Users checked/inserted');
-
-    // FETCH IDs DIRECTLY FROM DB (Fixes the null owner_id issue)
-    const accs = { 'User Admin': [], 'Interior Designer': [], 'Customer': [], 'Platform Manager': [] };
-    const allUsers = (await c.query(`
-      SELECT a.account_id, p.profile_name 
-      FROM user_account a 
-      JOIN user_profile p ON p.profile_id = a.profile_id
-    `)).rows;
-    
-    allUsers.forEach(u => {
-      if (accs[u.profile_name]) accs[u.profile_name].push(u.account_id);
-    });
-
-    // 3. Companies
-    for (let i = 1; i <= 50; i++) {
-      await c.query('INSERT INTO company (owner_id, company_name, address) VALUES ($1,$2,$3)', [rnd(accs['Interior Designer']), 'Studio ' + rnd(LAST) + ' ' + i, 'Address ' + i]);
-    }
-    const comps = (await c.query('SELECT company_id FROM company')).rows.map(r => r.company_id);
-    console.log('✅ Companies inserted');
-
-    // 4. Categories
-    for (const cat of CATS) {
-      await c.query('INSERT INTO category (category_name) VALUES ($1) ON CONFLICT DO NOTHING', [cat]);
-    }
-    const catIds = (await c.query('SELECT category_id FROM category')).rows.map(r => r.category_id);
-
-    // 5. Projects
-    const projs = [];
-    for (let i = 1; i <= 100; i++) {
-      const st = Math.random() < 0.4 ? 'Completed' : 'Ongoing';
+    const users = [
+      ['User Admin', 'admin@example.test'],
+      ['Interior Designer', 'designer@example.test'],
+      ['Customer', 'customer@example.test'],
+      ['Platform Manager', 'manager@example.test']
+    ];
+    const uids = {};
+    for (const [role, email] of users) {
       const r = await c.query(
-        'INSERT INTO project (company_id, title, description, status, image_url) VALUES ($1,$2,$3,$4,$5) RETURNING project_id',
-        [rnd(comps), 'Project ' + rnd(FIRST) + ' ' + i, 'Sample interior design project.', st, '/img/sample.jpg']
+        'INSERT INTO user_account (profile_id, username, email, password_hash) VALUES ($1, $2, $3, $4) RETURNING account_id',
+        [pids[role], role.replace(/\s+/g, '').toLowerCase(), email, hash]
       );
-      projs.push(r.rows[0].project_id);
-      await c.query('INSERT INTO project_category (project_id, category_id) VALUES ($1,$2) ON CONFLICT DO NOTHING', [r.rows[0].project_id, rnd(catIds)]);
+      uids[role] = r.rows[0].account_id;
     }
-    console.log('✅ Projects inserted');
+    console.log('✅ 4 Accounts created');
 
-    // 6. Project Views (for the interest metrics)
-    for (let i = 0; i < 200; i++) {
-      await c.query('INSERT INTO project_view (project_id, customer_id) VALUES ($1,$2)', [rnd(projs), rnd(accs['Customer'])]);
-    }
-    console.log('✅ Views inserted');
+    // 4. Insert 1 Company for the Designer
+    const compRes = await c.query(
+      'INSERT INTO company (owner_id, company_name, address, contact_no) VALUES ($1, $2, $3, $4) RETURNING company_id',
+      [uids['Interior Designer'], 'My Design Studio', '123 Orchard Road, Singapore', '+65 9123 4567']
+    );
+    const companyId = compRes.rows[0].company_id;
 
-    // 7. Favourites (for shortlists)
-    for (let i = 0; i < 100; i++) {
-      await c.query('INSERT INTO favourite (customer_id, project_id) VALUES ($1,$2) ON CONFLICT DO NOTHING', [rnd(accs['Customer']), rnd(projs)]);
+    // 5. Insert 3 Categories
+    const cats = ['Residential', 'Commercial', 'Kitchen'];
+    const catIds = [];
+    for (const cat of cats) {
+      const r = await c.query('INSERT INTO category (category_name) VALUES ($1) RETURNING category_id', [cat]);
+      catIds.push(r.rows[0].category_id);
     }
-    console.log('✅ Favourites inserted');
+
+    // 6. Insert a few Starter Projects for the Designer
+    const projects = [
+      ['Modern BTO Renovation', 'A sleek 4-room BTO flat.', 'Ongoing', '/img/sample.jpg'],
+      ['Luxury Condo Makeover', 'High-end interior design.', 'Completed', '/img/sample.jpg'],
+      ['Minimalist Office Space', 'Clean lines and ergonomic design.', 'Ongoing', '/img/sample.jpg']
+    ];
+    for (const [title, desc, status, img] of projects) {
+      const p = await c.query(
+        'INSERT INTO project (company_id, title, description, status, image_url) VALUES ($1, $2, $3, $4, $5) RETURNING project_id',
+        [companyId, title, desc, status, img]
+      );
+      // Link to a random category
+      await c.query('INSERT INTO project_category (project_id, category_id) VALUES ($1, $2)', [p.rows[0].project_id, catIds[Math.floor(Math.random() * catIds.length)]]);
+    }
+    console.log('✅ Starter company and projects created');
 
     await c.query('COMMIT');
     console.log('--- SEED COMPLETE & COMMITTED ---');

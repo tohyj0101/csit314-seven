@@ -5,12 +5,22 @@ const Auth = {
   login: async (req, res) => {
     const { email, password } = req.body;
     if (!email || !password) return res.status(400).json({ error: 'Email and password required' });
+    
     const u = await U.findByEmail(email);
     if (!u) return res.status(401).json({ error: 'Invalid credentials' });
     if (u.status === 'Suspended') return res.status(403).json({ error: 'Account suspended' });
-    if (!(await verifyPassword(password, u.password_hash))) return res.status(401).json({ error: 'Invalid credentials' });
+    
+    if (!(await verifyPassword(password, u.password_hash))) {
+      return res.status(401).json({ error: 'Invalid credentials' });
+    }
+    
     req.session.user = { account_id: u.account_id, username: u.username, role: u.profile_name };
-    res.json({ user: req.session.user });
+    
+    // Force session to save before responding
+    req.session.save((err) => {
+      if (err) return res.status(500).json({ error: 'Session save failed' });
+      res.json({ user: req.session.user });
+    });
   },
   logout: (req, res) => req.session.destroy(() => res.json({ ok: true })),
   me: (req, res) => req.session && req.session.user ? res.json({ user: req.session.user }) : res.status(401).json({ error: 'Not authenticated' })
