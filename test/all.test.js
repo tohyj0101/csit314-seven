@@ -6,8 +6,15 @@ const { hashPassword } = require('../config/auth');
 let dAgent, cAgent, aAgent, mAgent;
 
 beforeAll(async () => {
-  // 0. Clean up ALL test data from previous runs
-  await pool.query("DELETE FROM user_account WHERE email LIKE '%@example.test'");
+  // 0. Targeted cleanup: ONLY delete the accounts created by these tests
+  const testEmails = [
+    'idtest@example.test', 'custtest@example.test', 'admintest@example.test', 'pmtest@example.test',
+    'user+a@example.test', 'user+b@example.test', 'user+c@example.test', 'user+d@example.test'
+  ];
+  
+  for (const email of testEmails) {
+    await pool.query("DELETE FROM user_account WHERE email = $1", [email]);
+  }
   await pool.query("DELETE FROM company WHERE company_name IN ('Test Studio', 'Test Studio v2', 'ToDel', 'ProjCo')");
   await pool.query("DELETE FROM category WHERE category_name LIKE 'TC%'");
 
@@ -48,8 +55,15 @@ beforeAll(async () => {
 });
 
 afterAll(async () => {
-  // Final Cleanup
-  await pool.query("DELETE FROM user_account WHERE email LIKE '%@example.test'");
+  // Targeted cleanup: Leave the seeded users intact!
+  const testEmails = [
+    'idtest@example.test', 'custtest@example.test', 'admintest@example.test', 'pmtest@example.test',
+    'user+a@example.test', 'user+b@example.test', 'user+c@example.test', 'user+d@example.test'
+  ];
+  
+  for (const email of testEmails) {
+    await pool.query("DELETE FROM user_account WHERE email = $1", [email]);
+  }
   await pool.query("DELETE FROM company WHERE company_name IN ('Test Studio', 'Test Studio v2', 'ToDel', 'ProjCo')");
   await pool.query("DELETE FROM category WHERE category_name LIKE 'TC%'");
   await pool.end();
@@ -71,6 +85,7 @@ describe('user account (#3-7)', () => {
   test('#3 create', async () => { expect((await aAgent.post('/api/users').send({ profile_id: custProfileId, username: 'user+a', email: 'user+a@example.test', password: 'Password123!' })).status).toBe(201) });
   test('#3 dup→409', async () => { expect((await aAgent.post('/api/users').send({ profile_id: custProfileId, username: 'user+b', email: 'user+a@example.test', password: 'x' })).status).toBe(409) });
   test('#3 missing→400', async () => { expect((await aAgent.post('/api/users').send({ username: 'x' })).status).toBe(400) });
+  // FIXED: Using .query() to properly encode the '+' sign
   test('#5/#7 search', async () => { expect((await aAgent.get('/api/users/search').query({ q: 'user+a' })).body.users.length).toBeGreaterThanOrEqual(1) });
   test('#6 double suspend→409', async () => { const id = (await aAgent.post('/api/users').send({ profile_id: custProfileId, username: 'user+c', email: 'user+c@example.test', password: 'Password123!' })).body.user.account_id; expect((await aAgent.patch('/api/users/' + id + '/suspend')).status).toBe(200); expect((await aAgent.patch('/api/users/' + id + '/suspend')).status).toBe(409) });
   test('#4 update', async () => { const id = (await aAgent.post('/api/users').send({ profile_id: custProfileId, username: 'user+d', email: 'user+d@example.test', password: 'Password123!' })).body.user.account_id; expect((await aAgent.put('/api/users/' + id).send({ username: 'user+d-up' })).body.user.username).toBe('user+d-up') });
