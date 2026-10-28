@@ -1,16 +1,174 @@
-*{box-sizing:border-box}
-body{font-family:system-ui,sans-serif;margin:0;padding:0 0 3rem;background:#f4f6f8;color:#1c2733}
-nav{background:#1c2733;padding:.75rem 1rem;display:flex;gap:.5rem;flex-wrap:wrap;align-items:center}
-nav a,nav button{color:#fff;background:none;border:1px solid #4a5b6d;border-radius:6px;padding:.35rem .75rem;font-size:.9rem;cursor:pointer;text-decoration:none}
-nav a:hover,nav button:hover{background:#2c3e50}
-.card{max-width:960px;margin:2rem auto;background:#fff;padding:1.5rem 2rem;border-radius:10px;box-shadow:0 2px 8px rgba(0,0,0,.08)}
-h1{font-size:1.4rem;margin-top:0}
-h2{font-size:1.05rem;margin-top:1.5rem}
-label{display:block;margin:.6rem 0;font-size:.9rem}
-input,select,textarea{display:block;width:100%;padding:.5rem .6rem;margin-top:.25rem;border:1px solid #cfd8e3;border-radius:6px;font-size:.95rem}
-button{padding:.5rem 1rem;border:0;border-radius:6px;background:#2563eb;color:#fff;cursor:pointer;font-size:.9rem}
-button:hover{background:#1d4ed8}
-.error{color:#b91c1c;font-size:.88rem;min-height:1.2em}
-table{width:100%;border-collapse:collapse;margin-top:1rem;font-size:.9rem}
-th,td{text-align:left;padding:.5rem .4rem;border-bottom:1px solid #e5eaf1}
-th{background:#f0f3f7}
+/* =========================================
+   GLOBAL STYLES & VARIABLES
+   ========================================= */
+:root {
+  --primary: #2563eb;
+  --primary-hover: #1d4ed8;
+  --secondary: #64748b;
+  --secondary-hover: #475569;
+  --danger: #dc2626;
+  --danger-hover: #b91c1c;
+  --warning: #d97706;
+  --warning-hover: #b45309;
+  --success: #16a34a;
+  --bg-color: #f8fafc;
+  --card-bg: #ffffff;
+  --text-main: #1e293b;
+  --text-muted: #64748b;
+  --border-color: #e2e8f0;
+}
+
+* { box-sizing: border-box; }
+
+body {
+  font-family: 'Segoe UI', system-ui, -apple-system, sans-serif;
+  margin: 0;
+  padding: 0;
+  background-color: var(--bg-color);
+  color: var(--text-main);
+  line-height: 1.5;
+}
+
+/* =========================================
+   NAVIGATION
+   ========================================= */
+nav {
+  background-color: var(--text-main);
+  padding: 1rem 2rem;
+  display: flex;
+  align-items: center;
+  gap: 1rem;
+  box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+}
+
+nav a {
+  color: #ffffff;
+  text-decoration: none;
+  font-weight: 500;
+  padding: 0.5rem 1rem;
+  border-radius: 6px;
+  transition: background 0.2s;
+}
+
+nav a:hover { background-color: rgba(255,255,255,0.1); }
+
+nav button {
+  margin-left: auto;
+  background-color: var(--danger);
+  color: white;
+  border: none;
+  padding: 0.5rem 1rem;
+  border-radius: 6px;
+  cursor: pointer;
+  font-weight: 500;
+}
+
+nav button:hover { background-color: var(--danger-hover); }
+
+/* =========================================
+   CARDS & CONTAINERS
+   ========================================= */
+.card {
+  max-width: 1200px;
+  margin: 2rem auto;
+  background: var(--card-bg);
+  padding: 2rem;
+  border-radius: 12px;
+  box-shadow: 0 4px 6px -1px rgba(0,0,0,0.05);
+}
+
+h1 { margin-top: 0; font-size: 1.5rem; color: var(--text-main); border-bottom: 2px solid var(--border-color); padding-bottom: 0.5rem; }
+h2 { font-size: 1.2rem; margin-top: 2rem; color: var(--text-main); }
+
+/* =========================================
+   FORMS
+   ========================================= */
+.form-group { margin-bottom: 1rem; }
+label { display: block; font-weight: 500; margin-bottom: 0.3rem; font-size: 0.9rem; }
+input, select, textarea {
+  width: 100%;
+  padding: 0.6rem;
+  border: 1px solid var(--border-color);
+  border-radius: 6px;
+  font-size: 0.95rem;
+  font-family: inherit;
+}
+input:focus, select:focus { outline: 2px solid var(--primary); border-color: transparent; }
+
+/* =========================================
+   BUTTONS (Standardized Arrangement)
+   ========================================= */
+.btn {
+  padding: 0.5rem 1rem;
+  border: none;
+  border-radius: 6px;
+  font-size: 0.9rem;
+  font-weight: 500;
+  cursor: pointer;
+  transition: all 0.2s;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.3rem;
+}
+
+.btn-primary { background-color: var(--primary); color: white; }
+.btn-primary:hover { background-color: var(--primary-hover); }
+
+.btn-secondary { background-color: var(--secondary); color: white; }
+.btn-secondary:hover { background-color: var(--secondary-hover); }
+
+.btn-danger { background-color: var(--danger); color: white; }
+.btn-danger:hover { background-color: var(--danger-hover); }
+
+.btn-warning { background-color: var(--warning); color: white; }
+.btn-warning:hover { background-color: var(--warning-hover); }
+
+.btn-success { background-color: var(--success); color: white; }
+.btn-success:hover { background-color: var(--success-hover); }
+
+/* Action Button Groups in Tables */
+.actions {
+  display: flex;
+  gap: 0.5rem;
+  flex-wrap: wrap;
+}
+
+/* =========================================
+   TABLES
+   ========================================= */
+table {
+  width: 100%;
+  border-collapse: collapse;
+  margin-top: 1rem;
+  font-size: 0.9rem;
+}
+th, td {
+  padding: 0.75rem;
+  text-align: left;
+  border-bottom: 1px solid var(--border-color);
+}
+th { background-color: var(--bg-color); font-weight: 600; color: var(--text-muted); }
+tr:hover { background-color: #f1f5f9; }
+
+/* =========================================
+   VIEW PANELS & MESSAGES
+   ========================================= */
+#view-panel {
+  display: none;
+  background: #f8fafc;
+  border: 1px solid var(--border-color);
+  border-left: 4px solid var(--primary);
+  padding: 1.5rem;
+  border-radius: 6px;
+  margin-bottom: 1.5rem;
+}
+#view-panel h3 { margin-top: 0; }
+
+.error {
+  color: var(--danger);
+  font-weight: 500;
+  min-height: 1.5rem;
+  margin: 1rem 0;
+}
+.success { color: var(--success); font-weight: 500; }

@@ -4,18 +4,19 @@ An online platform designed to match renovation customers to interior designers,
 
 ## 🏗️ Architecture & Methodologies
 
-This project strictly follows the **Boundary-Control-Entity (BCE)** architectural framework and was developed using **Agile (Scrum)** methodologies.
+This project strictly follows the **Boundary-Control-Entity (BCE)** architectural framework and was developed using **Agile (Scrum)** methodologies. The frontend is a responsive, vanilla JavaScript Single Page Application (SPA).
 
+### Tech Stack
 *   **Backend:** Node.js, Express.js
 *   **Database:** PostgreSQL
-*   **Frontend:** Vanilla HTML, CSS, JavaScript (Single Page Application)
-*   **Testing:** Jest, Supertest (Test-Driven Development)
-*   **CI/CD:** GitHub Actions (Automated cloud testing pipeline)
+*   **Frontend:** HTML5, CSS3, Vanilla JavaScript
+*   **Testing:** Jest, Supertest
+*   **CI/CD:** GitHub Actions
 
 ### BCE Layer Structure
-*   **Boundary (`bce/routes.js`):** Express routers that handle HTTP requests and route them to controllers.
-*   **Control (`bce/controllers.js`):** Contains the core business logic, validation, and role-based access control.
-*   **Entity (`bce/entities.js`):** Handles all direct PostgreSQL database interactions (SQL queries).
+*   **Boundary (`bce/routes.js`):** Express routers that intercept HTTP requests, handle role-based access control (RBAC) middleware, and delegate to controllers.
+*   **Control (`bce/controllers.js`):** Contains the core business logic, data validation, and state management.
+*   **Entity (`bce/entities.js`):** Handles all direct PostgreSQL database interactions using parameterized SQL queries to prevent SQL injection.
 
 ---
 
@@ -29,6 +30,6 @@ Make sure you have the following installed on your machine:
 ### 1. Installation
 Clone the repository and install the dependencies:
 ```bash
-git clone https://github.com/YOUR-USERNAME/YOUR-REPO-NAME.git
+git clone https://github.com/tohyj0101/csit314-seven.git
 cd csit314-seven
 npm install
