@@ -6,11 +6,6 @@
 // 1. GLOBAL UTILITIES & ERROR HANDLING
 // =============================================================================
 
-/**
- * Global API fetch wrapper.
- * Handles JSON parsing, credentials, and user-friendly error catching.
- * Why? To prevent raw "Internal Server Error" messages from confusing the user.
- */
 async function api(u, o = {}) {
   try {
     const r = await fetch(u, {
@@ -21,13 +16,10 @@ async function api(u, o = {}) {
     });
     
     let b = null;
-    try { b = await r.json(); } catch (_) { /* Handle empty body */ }
+    try { b = await r.json(); } catch (_) { }
     
     if (!r.ok) {
-      // If the backend provided a specific validation error, use it.
       if (b && b.error) throw new Error(b.error);
-      
-      // Otherwise, fallback to friendly HTTP status messages
       if (r.status === 401) throw new Error('Your session has expired. Please log in again.');
       if (r.status === 403) throw new Error('You do not have permission to perform this action.');
       if (r.status === 404) throw new Error('The requested item could not be found.');
@@ -35,7 +27,6 @@ async function api(u, o = {}) {
       if (r.status === 500) throw new Error('The server encountered an issue. Please try again in a few moments.');
       throw new Error('An unknown network error occurred.');
     }
-    
     return b || {};
   } catch (err) {
     if (err.name === 'TypeError' && err.message.includes('Failed to fetch')) {
@@ -45,15 +36,10 @@ async function api(u, o = {}) {
   }
 }
 
-/**
- * Security Helper: XSS Prevention.
- */
 const esc = s => String(s ?? '').replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
+const fmtDate = d => d ? new Date(d).toLocaleString('en-SG', { timeZone: 'Asia/Singapore', hour12: true }) : 'N/A';
 const $ = s => document.querySelector(s), app = () => $('#app');
 
-/**
- * Performance Optimization: Predictive Search (Debounce).
- */
 function debounce(func, delay) {
   let timeout;
   return function (...args) {
@@ -62,9 +48,6 @@ function debounce(func, delay) {
   };
 }
 
-/**
- * UI Helper: Displays Success (Green) or Failure (Red) messages.
- */
 function showMsg(id, text, isError) {
   const el = $('#' + id);
   if (!el) return;
@@ -73,20 +56,15 @@ function showMsg(id, text, isError) {
   el.style.fontWeight = 'bold';
 }
 
-/**
- * UI Component: Reusable HTML Table Generator.
- */
-const tbl = (cols, rows, act) => `
-  <table>
-    <thead><tr>${cols.map(c => `<th>${c}</th>`).join('')}<th>Actions</th></tr></thead>
-    <tbody>${rows.map(r => `<tr>${cols.map(c => `<td>${esc(r[c])}</td>`).join('')}<td>${act(r)}</td></tr>`).join('')}</tbody>
-  </table>`;
+const pageHeader = (title, desc) => `
+  <div class="page-header">
+    <h1>${title}</h1>
+    <p>${desc}</p>
+  </div>
+`;
 
-/**
- * UI Component: Application Shell (Navigation Bar).
- */
 const shell = h => {
-  const u = window.__user, links = [['#/', 'Home']];
+  const u = window.__user, links = [['#/', 'Dashboard']];
   if (u.role === 'User Admin') links.push(['#/admin', 'Users'], ['#/profiles', 'Profiles']);
   if (u.role === 'Interior Designer') links.push(['#/companies', 'Companies'], ['#/projects', 'Projects']);
   if (u.role === 'Customer') links.push(['#/browse', 'Browse'], ['#/favourites', 'Favourites']);
@@ -95,7 +73,7 @@ const shell = h => {
   app().innerHTML = `
     <nav>
       ${links.map(([h, l]) => `<a href="${h}">${l}</a>`).join('')}
-      <button id="lo" class="btn btn-danger">Logout</button>
+      <button id="lo">Logout</button>
     </nav>
     <main class="card">${h}</main>
   `;
@@ -107,17 +85,17 @@ const shell = h => {
 }
 
 // =============================================================================
-// 2. AUTHENTICATION (US #1, #13, #35, #39)
+// 2. AUTHENTICATION & DASHBOARD
 // =============================================================================
 function login() {
   app().innerHTML = `
-    <main class="card" style="max-width:420px; margin-top:100px;">
-      <h1 style="text-align:center;">Sign in</h1>
+    <main class="card" style="max-width:480px; margin-top:100px;">
+      ${pageHeader('Sign In', 'Enter your credentials to access the internal dashboard based on your assigned Role-Based Access Control (RBAC) profile.')}
       <form id="f">
         <div class="form-group"><label>Email</label><input name="email" type="email" required /></div>
         <div class="form-group"><label>Password</label><input name="password" type="password" required /></div>
         <p id="m" class="error"></p>
-        <button type="submit" class="btn btn-primary" style="width:100%;">Login</button>
+        <button type="submit" class="btn btn-elegant" style="width:100%;">Login</button>
       </form>
     </main>`;
     
@@ -135,46 +113,123 @@ function login() {
 }
 
 async function dashboard() {
-  shell(`<h1>Welcome, ${esc(window.__user.username)}</h1>
-         <p>Role: <strong>${esc(window.__user.role)}</strong></p>
-         <p>Use the navigation bar above to manage the system.</p>`);
+  const role = window.__user.role;
+  const name = esc(window.__user.username);
+  let content = '';
+
+  if (role === 'User Admin') {
+    content = `
+      ${pageHeader(`Welcome, ${name}`, 'User Administration Dashboard')}
+      <div class="data-grid" style="grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));">
+        <div class="data-card" style="padding: 2.5rem 2rem; text-align: center;">
+          <h3 style="margin-bottom: 1rem; font-size: 1.5rem;">User Accounts</h3>
+          <p class="meta-text" style="margin-bottom: 2rem;">Manage platform users, reset credentials, and toggle account access.</p>
+          <a href="#/admin" class="btn btn-elegant" style="width: 100%;">Manage Users</a>
+        </div>
+        <div class="data-card" style="padding: 2.5rem 2rem; text-align: center;">
+          <h3 style="margin-bottom: 1rem; font-size: 1.5rem;">RBAC Profiles</h3>
+          <p class="meta-text" style="margin-bottom: 2rem;">Configure system roles and assign granular module permissions.</p>
+          <a href="#/profiles" class="btn btn-elegant" style="width: 100%;">Manage Profiles</a>
+        </div>
+      </div>
+    `;
+  } else if (role === 'Interior Designer') {
+    content = `
+      ${pageHeader(`Welcome, ${name}`, 'Designer Workspace')}
+      <div class="data-grid" style="grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));">
+        <div class="data-card" style="padding: 2.5rem 2rem; text-align: center;">
+          <h3 style="margin-bottom: 1rem; font-size: 1.5rem;">Portfolio Projects</h3>
+          <p class="meta-text" style="margin-bottom: 2rem;">Upload new designs, track project status, and view engagement metrics.</p>
+          <a href="#/projects" class="btn btn-elegant" style="width: 100%;">View Portfolio</a>
+        </div>
+        <div class="data-card" style="padding: 2.5rem 2rem; text-align: center;">
+          <h3 style="margin-bottom: 1rem; font-size: 1.5rem;">Company Entities</h3>
+          <p class="meta-text" style="margin-bottom: 2rem;">Update your registered business details and contact information.</p>
+          <a href="#/companies" class="btn btn-elegant" style="width: 100%;">Manage Companies</a>
+        </div>
+      </div>
+    `;
+  } else if (role === 'Customer') {
+    content = `
+      ${pageHeader(`Welcome, ${name}`, 'Your Inspiration Hub')}
+      <div class="data-grid" style="grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));">
+        <div class="data-card" style="padding: 2.5rem 2rem; text-align: center;">
+          <h3 style="margin-bottom: 1rem; font-size: 1.5rem;">Discovery Gallery</h3>
+          <p class="meta-text" style="margin-bottom: 2rem;">Explore our curated collection of premium interior designs.</p>
+          <a href="#/browse" class="btn btn-elegant" style="width: 100%;">Browse Designs</a>
+        </div>
+        <div class="data-card" style="padding: 2.5rem 2rem; text-align: center;">
+          <h3 style="margin-bottom: 1rem; font-size: 1.5rem;">My Favourites</h3>
+          <p class="meta-text" style="margin-bottom: 2rem;">Review the rooms and projects you have saved to your mood board.</p>
+          <a href="#/favourites" class="btn btn-elegant" style="width: 100%;">View Shortlists</a>
+        </div>
+      </div>
+    `;
+  } else if (role === 'Platform Manager') {
+    content = `
+      ${pageHeader(`Welcome, ${name}`, 'Platform Management Dashboard')}
+      <div class="data-grid" style="grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));">
+        <div class="data-card" style="padding: 2.5rem 2rem; text-align: center;">
+          <h3 style="margin-bottom: 1rem; font-size: 1.5rem;">Executive Reports</h3>
+          <p class="meta-text" style="margin-bottom: 2rem;">Generate traffic, engagement, and user acquisition analytics.</p>
+          <a href="#/reports" class="btn btn-elegant" style="width: 100%;">View Analytics</a>
+        </div>
+        <div class="data-card" style="padding: 2.5rem 2rem; text-align: center;">
+          <h3 style="margin-bottom: 1rem; font-size: 1.5rem;">Taxonomy</h3>
+          <p class="meta-text" style="margin-bottom: 2rem;">Maintain the standard classification tags used across the platform.</p>
+          <a href="#/categories" class="btn btn-elegant" style="width: 100%;">Manage Categories</a>
+        </div>
+      </div>
+    `;
+  } else {
+    content = pageHeader(`Welcome, ${name}`, `You are logged in as a <strong>${esc(role)}</strong>. Use the top navigation bar to access your modules.`);
+  }
+
+  shell(content);
 }
 
 // =============================================================================
-// 3. USER ACCOUNTS (US #3 - #7) - Admin Only
+// 3. USER ACCOUNTS (Admin Only)
 // =============================================================================
 async function adminList() {
-  let U = (await api('/api/users')).users;
-  const rows = u => tbl(['account_id', 'username', 'email', 'profile_name', 'status'], u, x => `
-    <div class="actions">
-      <a href="#/admin/view/${x.account_id}" class="btn btn-primary">View</a>
-      <a href="#/admin/edit/${x.account_id}" class="btn btn-secondary">Edit</a>
-      <button class="btn ${x.status === 'Active' ? 'btn-warning' : 'btn-success'}" data-s="${x.account_id}" data-st="${x.status}">
-        ${x.status === 'Active' ? 'Suspend' : 'Activate'}
-      </button>
-    </div>
-  `);
-  
   shell(`
-    <h1>User Accounts</h1>
-    <div class="actions" style="margin-bottom: 1rem;">
-      <a href="#/admin/create" class="btn btn-primary">+ Create User</a>
+    ${pageHeader('User Account Management', 'Manage platform users, roles, and account statuses.')}
+    <div class="actions" style="justify-content: center; margin-bottom: 2rem;">
+      <a href="#/admin/create" class="btn btn-elegant">+ Create New User</a>
     </div>
-    <div class="actions" style="margin-bottom: 1rem;">
-      <input id="q" placeholder="Search username or email" style="flex:1; margin:0;" />
-      <button class="btn btn-primary" id="s">Search</button>
-      <button class="btn btn-secondary" id="r">Reset</button>
+    <div class="search-bar">
+      <input id="q" placeholder="Search by username or email..." style="flex:1;" />
+      <button class="btn btn-elegant" id="s">Search</button>
+      <button class="btn btn-outline" id="r">Reset</button>
     </div>
-    <div id="tb">${rows(U)}</div>
+    <div id="tb"></div>
   `);
 
   const reload = async q => {
     try {
       const u = (q ? await api('/api/users/search?q=' + encodeURIComponent(q)) : await api('/api/users')).users;
-      if (q && u.length === 0) {
-        $('#tb').innerHTML = '<p class="error">❌ No users found matching your search.</p>';
+      if (u.length === 0) {
+        $('#tb').innerHTML = '<p class="error">❌ No users found.</p>';
       } else {
-        $('#tb').innerHTML = rows(u);
+        $('#tb').innerHTML = `<div class="data-grid">` + u.map(x => `
+          <div class="data-card">
+            <div class="data-info">
+              <div class="data-header">
+                <h3>${esc(x.username)}</h3>
+                <span class="badge ${x.status === 'Active' ? 'badge-success' : 'badge-danger'}">${esc(x.status)}</span>
+              </div>
+              <p class="meta-text"><strong>Role:</strong> ${esc(x.profile_name)}</p>
+              <p class="meta-text"><strong>Email:</strong> ${esc(x.email)}</p>
+              <div class="actions" style="margin-top:auto; padding-top:1rem; border-top:1px solid #f0f0f0;">
+                <a href="#/admin/view/${x.account_id}" class="btn btn-outline" style="flex:1">View</a>
+                <a href="#/admin/edit/${x.account_id}" class="btn btn-outline" style="flex:1">Edit</a>
+                <button class="btn btn-outline" data-s="${x.account_id}" data-st="${x.status}" title="${x.status === 'Active' ? 'Suspend' : 'Activate'}">
+                  ${x.status === 'Active' ? '🛑' : '✅'}
+                </button>
+              </div>
+            </div>
+          </div>
+        `).join('') + `</div>`;
       }
     } catch (ex) { alert(ex.message); }
   };
@@ -184,9 +239,9 @@ async function adminList() {
   $('#r').onclick = () => { $('#q').value = ''; reload(); };
 
   $('#tb').onclick = async e => {
-    const s = e.target.getAttribute('data-s');
-    const st = e.target.getAttribute('data-st');
-    if (s) {
+    const btn = e.target.closest('[data-s]');
+    if (btn) {
+      const s = btn.getAttribute('data-s'), st = btn.getAttribute('data-st');
       if (!confirm(`Are you sure you want to ${st === 'Active' ? 'suspend' : 'activate'} this user?`)) return;
       try {
         await api('/api/users/' + s + '/' + (st === 'Active' ? 'suspend' : 'activate'), { method: 'PATCH' });
@@ -194,24 +249,25 @@ async function adminList() {
       } catch (ex) { alert(ex.message); }
     }
   };
+  await reload();
 }
 
 async function adminCreate() {
   let P = (await api('/api/profiles')).profiles;
   shell(`
-    <h1>Create User</h1>
-    <form id="cf">
+    ${pageHeader('Create User Account', 'Provision a new system user and assign their RBAC profile.')}
+    <form id="cf" style="max-width: 600px; margin: 0 auto;">
       <div class="form-group"><label>Username</label><input name="username" required /></div>
-      <div class="form-group"><label>Email</label><input name="email" type="email" required /></div>
-      <div class="form-group"><label>Password</label><input name="password" type="password" required /></div>
+      <div class="form-group"><label>Email Address</label><input name="email" type="email" required /></div>
+      <div class="form-group"><label>Temporary Password</label><input name="password" type="password" required /></div>
       <div class="form-group">
-        <label>Profile</label>
+        <label>Assign Profile Role</label>
         <select name="profile_id">${P.map(p => `<option value="${p.profile_id}">${esc(p.profile_name)}</option>`).join('')}</select>
       </div>
       <p id="m" class="error"></p>
-      <div class="actions">
-        <button type="submit" class="btn btn-primary">Create User</button>
-        <a href="#/admin" class="btn btn-secondary">Cancel</a>
+      <div class="actions" style="justify-content: center; margin-top: 2rem;">
+        <button type="submit" class="btn btn-elegant">Create Account</button>
+        <a href="#/admin" class="btn btn-outline">Cancel</a>
       </div>
     </form>
   `);
@@ -232,19 +288,18 @@ async function adminView(id) {
   try {
     const r = await api('/api/users/' + id);
     shell(`
-      <h1>View User</h1>
-      <div style="padding: 1rem; background: #f8fafc; border-radius: 6px;">
-        <p><strong>ID:</strong> ${r.user.account_id}</p>
-        <p><strong>Username:</strong> ${esc(r.user.username)}</p>
-        <p><strong>Email:</strong> ${esc(r.user.email)}</p>
-        <p><strong>Role:</strong> ${esc(r.user.profile_name)}</p>
-        <p><strong>Status:</strong> ${esc(r.user.status)}</p>
-      </div>
-      <div class="actions" style="margin-top: 1rem;">
-        <a href="#/admin" class="btn btn-secondary">Back to List</a>
+      ${pageHeader('User Details', 'Viewing immutable system record for ' + esc(r.user.username))}
+      <div style="max-width: 600px; margin: 0 auto; background: #fff; padding: 2rem; border-radius: 8px; border: 1px solid #f0f0f0;">
+        <p class="meta-text" style="font-size:1.1rem; margin-bottom:1rem;"><strong>System ID:</strong> #${r.user.account_id}</p>
+        <p class="meta-text" style="font-size:1.1rem; margin-bottom:1rem;"><strong>Email:</strong> ${esc(r.user.email)}</p>
+        <p class="meta-text" style="font-size:1.1rem; margin-bottom:1rem;"><strong>Assigned Role:</strong> ${esc(r.user.profile_name)}</p>
+        <p class="meta-text" style="font-size:1.1rem; margin-bottom:1rem;"><strong>Status:</strong> <span class="badge ${r.user.status === 'Active' ? 'badge-success' : 'badge-danger'}">${esc(r.user.status)}</span></p>
+        <div class="actions" style="margin-top: 2rem; justify-content:center;">
+          <a href="#/admin" class="btn btn-outline">Return to Directory</a>
+        </div>
       </div>
     `);
-  } catch (ex) { shell(`<h1>Error</h1><p class="error">❌ ${ex.message}</p><a href="#/admin" class="btn btn-secondary">Back</a>`); }
+  } catch (ex) { shell(`<p class="error">❌ ${ex.message}</p><a href="#/admin" class="btn btn-outline">Back</a>`); }
 }
 
 async function adminEdit(id) {
@@ -252,21 +307,21 @@ async function adminEdit(id) {
     const r = await api('/api/users/' + id);
     const P = (await api('/api/profiles')).profiles;
     shell(`
-      <h1>Edit User: ${esc(r.user.username)}</h1>
-      <form id="cf">
+      ${pageHeader('Edit User Account', 'Modify credentials and role assignments for ' + esc(r.user.username))}
+      <form id="cf" style="max-width: 600px; margin: 0 auto;">
         <div class="form-group"><label>Username</label><input name="username" value="${esc(r.user.username)}" required /></div>
         <div class="form-group"><label>Email</label><input name="email" type="email" value="${esc(r.user.email)}" required /></div>
-        <div class="form-group"><label>Password (leave blank to keep current)</label><input name="password" type="password" placeholder="New Password..." /></div>
+        <div class="form-group"><label>Reset Password (leave blank to keep current)</label><input name="password" type="password" placeholder="New Password..." /></div>
         <div class="form-group">
-          <label>Profile</label>
+          <label>Assign Profile Role</label>
           <select name="profile_id">
             ${P.map(p => `<option value="${p.profile_id}" ${p.profile_id === r.user.profile_id ? 'selected' : ''}>${esc(p.profile_name)}</option>`).join('')}
           </select>
         </div>
         <p id="m" class="error"></p>
-        <div class="actions">
-          <button type="submit" class="btn btn-primary">Save Changes</button>
-          <a href="#/admin" class="btn btn-secondary">Cancel</a>
+        <div class="actions" style="justify-content: center; margin-top: 2rem;">
+          <button type="submit" class="btn btn-elegant">Commit Changes</button>
+          <a href="#/admin" class="btn btn-outline">Cancel</a>
         </div>
       </form>
     `);
@@ -281,45 +336,52 @@ async function adminEdit(id) {
         window.location.hash = '#/admin';
       } catch (ex) { showMsg('m', '❌ ' + ex.message, true); }
     };
-  } catch (ex) { shell(`<h1>Error</h1><p class="error">❌ ${ex.message}</p><a href="#/admin" class="btn btn-secondary">Back</a>`); }
+  } catch (ex) { shell(`<p class="error">❌ ${ex.message}</p>`); }
 }
 
 // =============================================================================
-// 4. USER PROFILES (US #8 - #12) - Admin Only
+// 4. USER PROFILES (Admin Only)
 // =============================================================================
 async function profilesList() {
-  let L = (await api('/api/profiles')).profiles;
-  const rows = () => tbl(['profile_id', 'profile_name', 'status'], L, p => `
-    <div class="actions">
-      <a href="#/profiles/view/${p.profile_id}" class="btn btn-primary">View</a>
-      <a href="#/profiles/edit/${p.profile_id}" class="btn btn-secondary">Edit</a>
-      <button class="btn ${(p.status || 'Active') === 'Active' ? 'btn-warning' : 'btn-success'}" data-s="${p.profile_id}" data-st="${p.status || 'Active'}">
-        ${(p.status || 'Active') === 'Active' ? 'Suspend' : 'Activate'}
-      </button>
-    </div>
-  `);
-
   shell(`
-    <h1>User Profiles</h1>
-    <div class="actions" style="margin-bottom: 1rem;">
-      <a href="#/profiles/create" class="btn btn-primary">+ Create Profile</a>
+    ${pageHeader('RBAC Profiles', 'Manage platform roles and their granular system permissions.')}
+    <div class="actions" style="justify-content: center; margin-bottom: 2rem;">
+      <a href="#/profiles/create" class="btn btn-elegant">+ Create New Profile</a>
     </div>
-    <div class="actions" style="margin-bottom: 1rem;">
-      <input id="q" placeholder="Search profile name" style="flex:1; margin:0;" />
-      <button class="btn btn-primary" id="s">Search</button>
-      <button class="btn btn-secondary" id="r">Reset</button>
+    <div class="search-bar">
+      <input id="q" placeholder="Search profile titles..." style="flex:1;" />
+      <button class="btn btn-elegant" id="s">Search</button>
+      <button class="btn btn-outline" id="r">Reset</button>
     </div>
-    <div id="tb">${rows()}</div>
+    <div id="tb"></div>
   `);
 
   const reload = async (q) => {
-    if (q) {
-      L = (await api('/api/profiles/search?q=' + encodeURIComponent(q))).profiles;
-      if (L.length === 0) return $('#tb').innerHTML = '<p class="error">❌ No matching profiles found.</p>';
-    } else {
-      L = (await api('/api/profiles')).profiles;
-    }
-    $('#tb').innerHTML = rows();
+    try {
+      const L = (q ? await api('/api/profiles/search?q=' + encodeURIComponent(q)) : await api('/api/profiles')).profiles;
+      if (L.length === 0) {
+        $('#tb').innerHTML = '<p class="error">❌ No profiles found.</p>';
+      } else {
+        $('#tb').innerHTML = `<div class="data-grid">` + L.map(p => `
+          <div class="data-card">
+            <div class="data-info">
+              <div class="data-header">
+                <h3>${esc(p.profile_name)}</h3>
+                <span class="badge ${(p.status || 'Active') === 'Active' ? 'badge-success' : 'badge-danger'}">${esc(p.status || 'Active')}</span>
+              </div>
+              <p class="meta-text"><strong>ID:</strong> #${p.profile_id}</p>
+              <div class="actions" style="margin-top:auto; padding-top:1rem; border-top:1px solid #f0f0f0;">
+                <a href="#/profiles/view/${p.profile_id}" class="btn btn-outline" style="flex:1">View</a>
+                <a href="#/profiles/edit/${p.profile_id}" class="btn btn-outline" style="flex:1">Edit</a>
+                <button class="btn btn-outline" data-s="${p.profile_id}" data-st="${p.status || 'Active'}" title="${(p.status || 'Active') === 'Active' ? 'Suspend' : 'Activate'}">
+                  ${(p.status || 'Active') === 'Active' ? '🛑' : '✅'}
+                </button>
+              </div>
+            </div>
+          </div>
+        `).join('') + `</div>`;
+      }
+    } catch(ex) { alert(ex.message); }
   };
 
   $('#q').oninput = debounce(() => reload($('#q').value), 300);
@@ -327,9 +389,9 @@ async function profilesList() {
   $('#r').onclick = () => { $('#q').value = ''; reload(); };
 
   $('#tb').onclick = async (e) => {
-    const sId = e.target.getAttribute('data-s');
-    const sStatus = e.target.getAttribute('data-st');
-    if (sId) {
+    const btn = e.target.closest('[data-s]');
+    if (btn) {
+      const sId = btn.getAttribute('data-s'), sStatus = btn.getAttribute('data-st');
       if (!confirm(`Are you sure you want to ${sStatus === 'Active' ? 'suspend' : 'activate'} this profile?`)) return;
       try {
         await api('/api/profiles/' + sId + '/' + (sStatus === 'Active' ? 'suspend' : 'activate'), { method: 'PATCH' });
@@ -337,24 +399,27 @@ async function profilesList() {
       } catch(ex) { alert(ex.message); }
     }
   };
+  await reload();
 }
 
 async function profilesCreate() {
   const perms = ['user:manage', 'profile:manage', 'company:manage', 'project:manage', 'interest:view', 'project:view', 'favourite:manage', 'category:manage', 'report:generate'];
-  const checkboxes = perms.map(p => `<label style="display:inline-flex; align-items:center; margin-right: 1rem;"><input type="checkbox" name="permissions" value="${p}" style="margin-right:5px; width:auto;"> ${p}</label>`).join('');
+  const checkboxes = perms.map(p => `<label style="display:inline-flex; align-items:center; margin-right: 1.5rem; text-transform:none; font-weight:normal;"><input type="checkbox" name="permissions" value="${p}" style="width:auto; margin-right:8px;"> ${p}</label>`).join('');
 
   shell(`
-    <h1>Create Profile</h1>
-    <form id="pf">
-      <div class="form-group"><label>Profile Name</label><input name="profile_name" required placeholder="e.g. Senior Designer" /></div>
+    ${pageHeader('Define RBAC Profile', 'Create a new role structure and attach system permissions.')}
+    <form id="pf" style="max-width: 600px; margin: 0 auto;">
+      <div class="form-group"><label>Profile Designation (Name)</label><input name="profile_name" required placeholder="e.g. Senior Designer" /></div>
       <div class="form-group">
-        <label>Permissions:</label><br/>
-        <div style="display:flex; flex-wrap:wrap; gap:0.5rem;">${checkboxes}</div>
+        <label>System Permissions Grants</label>
+        <div style="display:flex; flex-wrap:wrap; gap:0.5rem; background:#fff; padding:1.5rem; border:1px solid #ddd; border-radius:4px;">
+          ${checkboxes}
+        </div>
       </div>
       <p id="m" class="error"></p>
-      <div class="actions">
-        <button type="submit" class="btn btn-primary">Create Profile</button>
-        <a href="#/profiles" class="btn btn-secondary">Cancel</a>
+      <div class="actions" style="justify-content: center; margin-top: 2rem;">
+        <button type="submit" class="btn btn-elegant">Create Profile</button>
+        <a href="#/profiles" class="btn btn-outline">Cancel</a>
       </div>
     </form>
   `);
@@ -375,18 +440,18 @@ async function profilesView(id) {
   try {
     const r = await api('/api/profiles/' + id);
     shell(`
-      <h1>View Profile</h1>
-      <div style="padding: 1rem; background: #f8fafc; border-radius: 6px;">
-        <p><strong>ID:</strong> ${r.profile.profile_id}</p>
-        <p><strong>Name:</strong> ${esc(r.profile.profile_name)}</p>
-        <p><strong>Status:</strong> ${esc(r.profile.status || 'Active')}</p>
-        <p><strong>Permissions:</strong> ${(r.profile.permissions || []).join(', ') || 'None'}</p>
-      </div>
-      <div class="actions" style="margin-top: 1rem;">
-        <a href="#/profiles" class="btn btn-secondary">Back to List</a>
+      ${pageHeader('Profile Access Blueprint', 'Reviewing system grants for ' + esc(r.profile.profile_name))}
+      <div style="max-width: 600px; margin: 0 auto; background: #fff; padding: 2rem; border-radius: 8px; border: 1px solid #f0f0f0;">
+        <p class="meta-text" style="font-size:1.1rem; margin-bottom:1rem;"><strong>ID:</strong> #${r.profile.profile_id}</p>
+        <p class="meta-text" style="font-size:1.1rem; margin-bottom:1rem;"><strong>Designation:</strong> ${esc(r.profile.profile_name)}</p>
+        <p class="meta-text" style="font-size:1.1rem; margin-bottom:1rem;"><strong>Status:</strong> <span class="badge ${(r.profile.status || 'Active') === 'Active' ? 'badge-success' : 'badge-danger'}">${esc(r.profile.status || 'Active')}</span></p>
+        <p class="meta-text" style="font-size:1.1rem; margin-bottom:1rem;"><strong>System Grants:</strong><br><br> ${(r.profile.permissions || []).map(p => `<span class="badge badge-neutral" style="margin:4px;">${p}</span>`).join('') || 'None Assigned'}</p>
+        <div class="actions" style="margin-top: 2rem; justify-content:center;">
+          <a href="#/profiles" class="btn btn-outline">Return to Directory</a>
+        </div>
       </div>
     `);
-  } catch (ex) { shell(`<h1>Error</h1><p class="error">❌ ${ex.message}</p><a href="#/profiles" class="btn btn-secondary">Back</a>`); }
+  } catch (ex) { shell(`<p class="error">❌ ${ex.message}</p><a href="#/profiles" class="btn btn-outline">Back</a>`); }
 }
 
 async function profilesEdit(id) {
@@ -395,21 +460,23 @@ async function profilesEdit(id) {
     const perms = ['user:manage', 'profile:manage', 'company:manage', 'project:manage', 'interest:view', 'project:view', 'favourite:manage', 'category:manage', 'report:generate'];
     const checkboxes = perms.map(p => {
       const checked = (r.profile.permissions || []).includes(p) ? 'checked' : '';
-      return `<label style="display:inline-flex; align-items:center; margin-right: 1rem;"><input type="checkbox" name="permissions" value="${p}" ${checked} style="margin-right:5px; width:auto;"> ${p}</label>`;
+      return `<label style="display:inline-flex; align-items:center; margin-right: 1.5rem; text-transform:none; font-weight:normal;"><input type="checkbox" name="permissions" value="${p}" ${checked} style="width:auto; margin-right:8px;"> ${p}</label>`;
     }).join('');
 
     shell(`
-      <h1>Edit Profile: ${esc(r.profile.profile_name)}</h1>
-      <form id="pf">
-        <div class="form-group"><label>Profile Name</label><input name="profile_name" value="${esc(r.profile.profile_name)}" required /></div>
+      ${pageHeader('Edit Profile Blueprint', 'Modify role designation or attached permissions.')}
+      <form id="pf" style="max-width: 600px; margin: 0 auto;">
+        <div class="form-group"><label>Profile Designation (Name)</label><input name="profile_name" value="${esc(r.profile.profile_name)}" required /></div>
         <div class="form-group">
-          <label>Permissions:</label><br/>
-          <div style="display:flex; flex-wrap:wrap; gap:0.5rem;">${checkboxes}</div>
+          <label>System Permissions Grants</label>
+          <div style="display:flex; flex-wrap:wrap; gap:0.5rem; background:#fff; padding:1.5rem; border:1px solid #ddd; border-radius:4px;">
+            ${checkboxes}
+          </div>
         </div>
         <p id="m" class="error"></p>
-        <div class="actions">
-          <button type="submit" class="btn btn-primary">Save Changes</button>
-          <a href="#/profiles" class="btn btn-secondary">Cancel</a>
+        <div class="actions" style="justify-content: center; margin-top: 2rem;">
+          <button type="submit" class="btn btn-elegant">Commit Changes</button>
+          <a href="#/profiles" class="btn btn-outline">Cancel</a>
         </div>
       </form>
     `);
@@ -424,39 +491,47 @@ async function profilesEdit(id) {
         window.location.hash = '#/profiles';
       } catch(ex) { showMsg('m', '❌ ' + ex.message, true); }
     };
-  } catch (ex) { shell(`<h1>Error</h1><p class="error">❌ ${ex.message}</p><a href="#/profiles" class="btn btn-secondary">Back</a>`); }
+  } catch (ex) { shell(`<p class="error">❌ ${ex.message}</p>`); }
 }
 
 // =============================================================================
-// 5. COMPANY INFORMATION (US #15 - #19) - Designer Only
+// 5. COMPANY INFORMATION (Designer Only)
 // =============================================================================
 async function companiesList() {
-  let L = (await api('/api/companies')).companies;
-  const rows = c => tbl(['company_id', 'company_name', 'address', 'contact_no'], c, x => `
-    <div class="actions">
-      <a href="#/companies/view/${x.company_id}" class="btn btn-primary">View</a>
-      <a href="#/companies/edit/${x.company_id}" class="btn btn-secondary">Edit</a>
-      <button class="btn btn-danger" data-d="${x.company_id}">Delete</button>
-    </div>
-  `);
-
   shell(`
-    <h1>Company Information</h1>
-    <div class="actions" style="margin-bottom: 1rem;">
-      <a href="#/companies/create" class="btn btn-primary">+ Create Company</a>
+    ${pageHeader('Company Directory', 'Manage your associated business entities before attaching projects.')}
+    <div class="actions" style="justify-content: center; margin-bottom: 2rem;">
+      <a href="#/companies/create" class="btn btn-elegant">+ Register Company</a>
     </div>
-    <div class="actions" style="margin-bottom: 1rem;">
-      <input id="q" placeholder="Search company name" style="flex:1; margin:0;" />
-      <button class="btn btn-primary" id="s">Search</button>
-      <button class="btn btn-secondary" id="r">Reset</button>
+    <div class="search-bar">
+      <input id="q" placeholder="Search business names or locations..." style="flex:1;" />
+      <button class="btn btn-elegant" id="s">Search</button>
+      <button class="btn btn-outline" id="r">Reset</button>
     </div>
-    <div id="tb">${rows(L)}</div>
+    <div id="tb"></div>
   `);
 
   const reload = async q => {
-    L = (q ? await api('/api/companies/search?q=' + encodeURIComponent(q)) : await api('/api/companies')).companies;
-    if (q && L.length === 0) return $('#tb').innerHTML = '<p class="error">❌ No companies found.</p>';
-    $('#tb').innerHTML = rows(L);
+    try {
+      const L = (q ? await api('/api/companies/search?q=' + encodeURIComponent(q)) : await api('/api/companies')).companies;
+      if (L.length === 0) {
+        $('#tb').innerHTML = '<p class="error">❌ No companies registered yet.</p>';
+      } else {
+        $('#tb').innerHTML = `<div class="data-grid">` + L.map(c => `
+          <div class="data-card" style="padding: 1.5rem;">
+            <h3 style="margin-bottom:1rem; font-size: 1.5rem; border-bottom: 1px solid #eee; padding-bottom:1rem;">${esc(c.company_name)}</h3>
+            <p class="meta-text" style="display:flex; align-items:flex-start; gap:8px;"><strong>📍</strong> <span>${esc(c.address || 'Address Unlisted')}</span></p>
+            <p class="meta-text" style="display:flex; align-items:center; gap:8px;"><strong>📞</strong> <span>${esc(c.contact_no || 'No Contact')}</span></p>
+            
+            <div class="actions" style="margin-top:auto; padding-top:1rem;">
+              <a href="#/companies/view/${c.company_id}" class="btn btn-outline" style="flex:1">View</a>
+              <a href="#/companies/edit/${c.company_id}" class="btn btn-outline" style="flex:1">Edit</a>
+              <button class="btn btn-danger" data-d="${c.company_id}" style="border:none;">Delete</button>
+            </div>
+          </div>
+        `).join('') + `</div>`;
+      }
+    } catch (ex) { alert(ex.message); }
   };
 
   $('#q').oninput = debounce(() => reload($('#q').value), 300);
@@ -465,26 +540,27 @@ async function companiesList() {
 
   $('#tb').onclick = async e => {
     const di = e.target.getAttribute('data-d');
-    if (di && confirm('Delete Company #' + di + '?')) {
+    if (di && confirm('Permanently remove Company #' + di + '? All attached projects will fail if restricted.')) {
       try {
         await api('/api/companies/' + di, { method: 'DELETE' });
         reload($('#q').value);
       } catch (ex) { alert(ex.message); }
     }
   };
+  await reload();
 }
 
 async function companiesCreate() {
   shell(`
-    <h1>Create Company</h1>
-    <form id="f">
-      <div class="form-group"><label>Company name</label><input name="company_name" required/></div>
-      <div class="form-group"><label>Address</label><input name="address"/></div>
-      <div class="form-group"><label>Contact</label><input name="contact_no"/></div>
+    ${pageHeader('Register Company', 'Enter your corporate details to associate future interior design projects.')}
+    <form id="f" style="max-width: 600px; margin: 0 auto;">
+      <div class="form-group"><label>Registered Business Name</label><input name="company_name" required/></div>
+      <div class="form-group"><label>HQ Address</label><input name="address"/></div>
+      <div class="form-group"><label>Contact Hotline</label><input name="contact_no"/></div>
       <p id="m" class="error"></p>
-      <div class="actions">
-        <button type="submit" class="btn btn-primary">Save Company</button> 
-        <a href="#/companies" class="btn btn-secondary">Cancel</a>
+      <div class="actions" style="justify-content: center; margin-top: 2rem;">
+        <button type="submit" class="btn btn-elegant">Save Business Profile</button> 
+        <a href="#/companies" class="btn btn-outline">Cancel</a>
       </div>
     </form>
   `);
@@ -504,33 +580,32 @@ async function companiesView(id) {
   try {
     const r = await api('/api/companies/' + id);
     shell(`
-      <h1>View Company</h1>
-      <div style="padding: 1rem; background: #f8fafc; border-radius: 6px;">
-        <p><strong>ID:</strong> ${r.company.company_id}</p>
-        <p><strong>Name:</strong> ${esc(r.company.company_name)}</p>
-        <p><strong>Address:</strong> ${esc(r.company.address || 'N/A')}</p>
-        <p><strong>Contact:</strong> ${esc(r.company.contact_no || 'N/A')}</p>
-      </div>
-      <div class="actions" style="margin-top: 1rem;">
-        <a href="#/companies" class="btn btn-secondary">Back to List</a>
+      ${pageHeader('Company Record', esc(r.company.company_name))}
+      <div style="max-width: 600px; margin: 0 auto; background: #fff; padding: 2rem; border-radius: 8px; border: 1px solid #f0f0f0;">
+        <p class="meta-text" style="font-size:1.1rem; margin-bottom:1rem;"><strong>Registry ID:</strong> #${r.company.company_id}</p>
+        <p class="meta-text" style="font-size:1.1rem; margin-bottom:1rem;"><strong>HQ Address:</strong> ${esc(r.company.address || 'Unlisted')}</p>
+        <p class="meta-text" style="font-size:1.1rem; margin-bottom:1rem;"><strong>Contact:</strong> ${esc(r.company.contact_no || 'Unlisted')}</p>
+        <div class="actions" style="margin-top: 2rem; justify-content:center;">
+          <a href="#/companies" class="btn btn-outline">Return to Directory</a>
+        </div>
       </div>
     `);
-  } catch (ex) { shell(`<h1>Error</h1><p class="error">❌ ${ex.message}</p><a href="#/companies" class="btn btn-secondary">Back</a>`); }
+  } catch (ex) { shell(`<p class="error">❌ ${ex.message}</p>`); }
 }
 
 async function companiesEdit(id) {
   try {
     const r = await api('/api/companies/' + id);
     shell(`
-      <h1>Edit Company: ${esc(r.company.company_name)}</h1>
-      <form id="f">
+      ${pageHeader('Edit Company', 'Updating details for ' + esc(r.company.company_name))}
+      <form id="f" style="max-width: 600px; margin: 0 auto;">
         <div class="form-group"><label>Company name</label><input name="company_name" value="${esc(r.company.company_name)}" required/></div>
         <div class="form-group"><label>Address</label><input name="address" value="${esc(r.company.address || '')}"/></div>
         <div class="form-group"><label>Contact</label><input name="contact_no" value="${esc(r.company.contact_no || '')}"/></div>
         <p id="m" class="error"></p>
-        <div class="actions">
-          <button type="submit" class="btn btn-primary">Save Changes</button> 
-          <a href="#/companies" class="btn btn-secondary">Cancel</a>
+        <div class="actions" style="justify-content: center; margin-top: 2rem;">
+          <button type="submit" class="btn btn-elegant">Commit Changes</button> 
+          <a href="#/companies" class="btn btn-outline">Cancel</a>
         </div>
       </form>
     `);
@@ -544,76 +619,100 @@ async function companiesEdit(id) {
         window.location.hash = '#/companies';
       } catch (ex) { showMsg('m', '❌ ' + ex.message, true); }
     };
-  } catch (ex) { shell(`<h1>Error</h1><p class="error">❌ ${ex.message}</p><a href="#/companies" class="btn btn-secondary">Back</a>`); }
+  } catch (ex) { shell(`<p class="error">❌ ${ex.message}</p>`); }
 }
 
 // =============================================================================
-// 6. PROJECTS (US #20 - #29, #37, #38) - Designer Only
+// 6. PROJECTS (Designer Only)
 // =============================================================================
 async function projectsList() {
   let CS = (await api('/api/companies')).companies;
-  if (!CS.length) return shell('<h1>Projects</h1><p class="error">❌ Please create a company first.</p><a href="#/companies/create" class="btn btn-primary">Create Company</a>');
+  if (!CS.length) return shell(pageHeader('Project Workspace', '❌ Please register a company first.') + `<div style="text-align:center;"><a href="#/companies/create" class="btn btn-elegant">Register Company</a></div>`);
   
-  let cur = CS[0].company_id, L = [], im = {};
+  if (!window._activeCompany || !CS.find(c => c.company_id == window._activeCompany)) {
+    window._activeCompany = CS[0].company_id;
+  }
   
-  const rows = () => tbl(['project_id', 'title', 'status', 'Metrics'], L, p => {
-    const i = im[p.project_id] || { views: 0, shortlists: 0 };
-    return `
-      <div class="actions">
-        <a href="#/projects/view/${p.project_id}" class="btn btn-primary">View</a>
-        <a href="#/projects/edit/${p.project_id}" class="btn btn-secondary">Edit</a>
-        <button class="btn btn-danger" data-d="${p.project_id}">Delete</button>
-        <span style="margin-left:10px; font-weight:bold; color:var(--text-muted);">V:${i.views} S:${i.shortlists}</span>
-      </div>
-    `;
-  });
+  let cur = window._activeCompany, L = [], im = {};
 
   shell(`
-    <h1>Projects</h1>
-    <div class="form-group">
-      <label>Select Company</label>
-      <select id="sel">${CS.map(c => `<option value="${c.company_id}">${esc(c.company_name)}</option>`).join('')}</select>
+    ${pageHeader('Project Workspace & Analytics', 'Track your portfolio and monitor audience engagement metrics (Views/Saves).')}
+    
+    <div style="max-width:800px; margin:0 auto; background: #fff; padding: 1.5rem; border-radius:8px; border:1px solid #eee; margin-bottom: 2rem; display:flex; gap: 1rem; align-items:flex-end;">
+      <div style="flex:1;">
+        <label style="font-size:0.8rem;">Operating Entity</label>
+        <select id="sel">${CS.map(c => `<option value="${c.company_id}" ${c.company_id == cur ? 'selected' : ''}>${esc(c.company_name)}</option>`).join('')}</select>
+      </div>
+      <a href="#/projects/create" class="btn btn-elegant">+ Publish Project</a>
     </div>
     
-    <div class="actions" style="margin-bottom: 1rem;">
-      <a href="#/projects/create" class="btn btn-primary">+ Create Project</a>
-    </div>
-    
-    <div class="actions" style="margin-bottom: 1rem;">
-      <input id="q" placeholder="Search projects..." style="flex:1; margin:0;" />
-      <select id="st" style="width:auto; margin:0;"><option value="">All Statuses</option><option>Ongoing</option><option>Completed</option></select>
-      <button class="btn btn-primary" id="s">Search</button>
-      <button class="btn btn-secondary" id="r">Reset</button>
+    <div class="search-bar">
+      <input id="q" placeholder="Search portfolio..." style="flex:1;" />
+      <select id="st" style="width:180px; border-radius:30px;"><option value="">All Statuses</option><option>Ongoing</option><option>Completed</option></select>
+      <button class="btn btn-elegant" id="s">Search</button>
+      <button class="btn btn-outline" id="r">Reset</button>
     </div>
     
     <div id="tb"></div>
   `);
 
   const reload = async q => {
-    im = {};
-    ((await api('/api/projects/company/' + cur + '/interest')).interest).forEach(i => im[i.project_id] = i);
-    
-    const st = $('#st').value;
-    let u = '/api/projects/company/' + cur;
-    if (q) u += '/search?q=' + encodeURIComponent(q) + (st ? '&status=' + st : '');
-    else if (st) u += '?status=' + st;
-    
-    L = (await api(u)).projects;
-    if (L.length === 0) {
-      $('#tb').innerHTML = '<p class="error">❌ No projects exist.</p>';
-    } else {
-      $('#tb').innerHTML = rows();
-    }
+    try {
+      im = {};
+      const interestReq = await api('/api/projects/company/' + cur + '/interest');
+      (interestReq.interest || []).forEach(i => im[i.project_id] = i);
+      
+      const st = $('#st').value;
+      let u = '/api/projects/company/' + cur;
+      if (q) u += '/search?q=' + encodeURIComponent(q) + (st ? '&status=' + st : '');
+      else if (st) u += '?status=' + st;
+      
+      L = (await api(u)).projects;
+      if (L.length === 0) {
+        $('#tb').innerHTML = '<p class="error">❌ Portfolio is empty for this criteria.</p>';
+      } else {
+        $('#tb').innerHTML = `<div class="data-grid">` + L.map(p => {
+          const i = im[p.project_id] || { views: 0, shortlists: 0 };
+          return `
+            <div class="data-card">
+              <img src="${p.image_url || 'https://via.placeholder.com/600x400?text=No+Cover+Image'}" alt="${esc(p.title)}">
+              <div class="data-info">
+                <div class="data-header">
+                  <h3>${esc(p.title)}</h3>
+                  <span class="badge ${p.status === 'Completed' ? 'badge-neutral' : 'badge-success'}">${esc(p.status)}</span>
+                </div>
+                
+                <div class="metrics-row">
+                  <div class="metric-item">👁️ ${i.views} Views</div>
+                  <div class="metric-item">⭐ ${i.shortlists} Saves</div>
+                </div>
+
+                <div class="actions" style="margin-top:auto;">
+                  <a href="#/projects/view/${p.project_id}" class="btn btn-outline" style="flex:1">View</a>
+                  <a href="#/projects/edit/${p.project_id}" class="btn btn-outline" style="flex:1">Edit</a>
+                  <button class="btn btn-danger" data-d="${p.project_id}" style="border:none;">Delete</button>
+                </div>
+              </div>
+            </div>
+          `;
+        }).join('') + `</div>`;
+      }
+    } catch (ex) { alert(ex.message); }
   };
 
-  $('#sel').onchange = e => { cur = e.target.value; reload(); };
+  $('#sel').onchange = e => { 
+    cur = e.target.value; 
+    window._activeCompany = cur;
+    reload(); 
+  };
+  
   $('#q').oninput = debounce(() => reload($('#q').value), 300);
   $('#s').onclick = () => reload($('#q').value);
   $('#r').onclick = () => { $('#q').value = ''; $('#st').value = ''; reload(); };
   
   $('#tb').onclick = async e => {
     const di = e.target.getAttribute('data-d');
-    if (di && confirm('Delete Project #' + di + '?')) {
+    if (di && confirm('Permanently remove Project #' + di + '?')) {
       try {
         await api('/api/projects/' + di, { method: 'DELETE' });
         reload($('#q').value);
@@ -626,26 +725,26 @@ async function projectsList() {
 
 async function projectsCreate() {
   let CS = (await api('/api/companies')).companies;
-  if (!CS.length) return shell('<h1>Error</h1><p class="error">❌ Please create a company first.</p><a href="#/companies" class="btn btn-secondary">Back</a>');
+  if (!CS.length) return shell(pageHeader('Publish Project', '❌ Missing company requirement.') + `<a href="#/companies" class="btn btn-outline">Back</a>`);
 
   shell(`
-    <h1>Create Project</h1>
-    <form id="f">
+    ${pageHeader('Publish Project', 'Add a new showcase to your portfolio.')}
+    <form id="f" style="max-width: 600px; margin: 0 auto;">
       <div class="form-group">
-        <label>Company</label>
+        <label>Governing Company</label>
         <select name="company_id">${CS.map(c => `<option value="${c.company_id}">${esc(c.company_name)}</option>`).join('')}</select>
       </div>
-      <div class="form-group"><label>Title</label><input name="title" required/></div>
-      <div class="form-group"><label>Description</label><textarea name="description" rows="2" required></textarea></div>
+      <div class="form-group"><label>Project Title</label><input name="title" required/></div>
+      <div class="form-group"><label>Design Narrative</label><textarea name="description" rows="4" required></textarea></div>
       <div class="form-group">
-        <label>Status</label>
+        <label>Phase Status</label>
         <select name="status"><option>Ongoing</option><option>Completed</option></select>
       </div>
-      <div class="form-group"><label>Image URL</label><input name="image_url"/></div>
+      <div class="form-group"><label>Hero Image URL</label><input name="image_url" placeholder="https://..."/></div>
       <p id="m" class="error"></p>
-      <div class="actions">
-        <button type="submit" class="btn btn-primary">Save Project</button> 
-        <a href="#/projects" class="btn btn-secondary">Cancel</a>
+      <div class="actions" style="justify-content: center; margin-top: 2rem;">
+        <button type="submit" class="btn btn-elegant">Publish Showcase</button> 
+        <a href="#/projects" class="btn btn-outline">Cancel</a>
       </div>
     </form>
   `);
@@ -654,7 +753,7 @@ async function projectsCreate() {
     e.preventDefault();
     const b = Object.fromEntries(new FormData(e.target));
     b.company_id = +b.company_id;
-    showMsg('m', 'Saving...', false);
+    showMsg('m', 'Publishing...', false);
     try {
       await api('/api/projects', { method: 'POST', body: JSON.stringify(b) });
       window.location.hash = '#/projects';
@@ -666,40 +765,41 @@ async function projectsView(id) {
   try {
     const r = await api('/api/projects/' + id);
     shell(`
-      <h1>View Project</h1>
-      <div style="padding: 1rem; background: #f8fafc; border-radius: 6px;">
-        <p><strong>Title:</strong> ${esc(r.project.title)}</p>
-        <p><strong>Description:</strong> ${esc(r.project.description || 'N/A')}</p>
-        <p><strong>Status:</strong> ${esc(r.project.status)}</p>
-        <p><strong>Image URL:</strong> ${esc(r.project.image_url || 'N/A')}</p>
-      </div>
-      <div class="actions" style="margin-top: 1rem;">
-        <a href="#/projects" class="btn btn-secondary">Back to List</a>
+      ${pageHeader('Project Profile', esc(r.project.title))}
+      <div style="max-width: 800px; margin: 0 auto; background: #fff; border-radius: 8px; border: 1px solid #f0f0f0; overflow:hidden;">
+        <img src="${r.project.image_url || 'https://via.placeholder.com/800x400?text=No+Cover+Image'}" style="width:100%; height:300px; object-fit:cover; border-bottom:1px solid #eee;">
+        <div style="padding: 2rem;">
+          <p class="meta-text" style="font-size:1.1rem; margin-bottom:1rem;"><span class="badge ${r.project.status === 'Completed' ? 'badge-neutral' : 'badge-success'}">${esc(r.project.status)}</span></p>
+          <p class="meta-text" style="font-size:1.1rem; margin-bottom:1rem; white-space:pre-line;">${esc(r.project.description || 'No narrative provided.')}</p>
+          <div class="actions" style="margin-top: 2rem; justify-content:center;">
+            <a href="#/projects" class="btn btn-outline">Return to Portfolio</a>
+          </div>
+        </div>
       </div>
     `);
-  } catch (ex) { shell(`<h1>Error</h1><p class="error">❌ ${ex.message}</p><a href="#/projects" class="btn btn-secondary">Back</a>`); }
+  } catch (ex) { shell(`<p class="error">❌ ${ex.message}</p>`); }
 }
 
 async function projectsEdit(id) {
   try {
     const r = await api('/api/projects/' + id);
     shell(`
-      <h1>Edit Project: ${esc(r.project.title)}</h1>
-      <form id="f">
-        <div class="form-group"><label>Title</label><input name="title" value="${esc(r.project.title)}" required/></div>
-        <div class="form-group"><label>Description</label><textarea name="description" rows="2" required>${esc(r.project.description || '')}</textarea></div>
+      ${pageHeader('Revise Showcase', 'Updating parameters for ' + esc(r.project.title))}
+      <form id="f" style="max-width: 600px; margin: 0 auto;">
+        <div class="form-group"><label>Project Title</label><input name="title" value="${esc(r.project.title)}" required/></div>
+        <div class="form-group"><label>Design Narrative</label><textarea name="description" rows="4" required>${esc(r.project.description || '')}</textarea></div>
         <div class="form-group">
-          <label>Status</label>
+          <label>Phase Status</label>
           <select name="status">
             <option value="Ongoing" ${r.project.status === 'Ongoing' ? 'selected' : ''}>Ongoing</option>
             <option value="Completed" ${r.project.status === 'Completed' ? 'selected' : ''}>Completed</option>
           </select>
         </div>
-        <div class="form-group"><label>Image URL</label><input name="image_url" value="${esc(r.project.image_url || '')}"/></div>
+        <div class="form-group"><label>Hero Image URL</label><input name="image_url" value="${esc(r.project.image_url || '')}"/></div>
         <p id="m" class="error"></p>
-        <div class="actions">
-          <button type="submit" class="btn btn-primary">Save Changes</button> 
-          <a href="#/projects" class="btn btn-secondary">Cancel</a>
+        <div class="actions" style="justify-content: center; margin-top: 2rem;">
+          <button type="submit" class="btn btn-elegant">Commit Revisions</button> 
+          <a href="#/projects" class="btn btn-outline">Cancel</a>
         </div>
       </form>
     `);
@@ -713,31 +813,50 @@ async function projectsEdit(id) {
         window.location.hash = '#/projects';
       } catch (ex) { showMsg('m', '❌ ' + ex.message, true); }
     };
-  } catch (ex) { shell(`<h1>Error</h1><p class="error">❌ ${ex.message}</p><a href="#/projects" class="btn btn-secondary">Back</a>`); }
+  } catch (ex) { shell(`<p class="error">❌ ${ex.message}</p>`); }
 }
 
 // =============================================================================
-// 7. CUSTOMER BROWSE (US #30 - #32) - Customer Only
+// 7. CUSTOMER BROWSE (Customer Only)
 // =============================================================================
 async function browseList() {
   shell(`
-    <h1>Browse Projects</h1>
-    <div class="actions" style="margin-bottom: 1rem;">
-      <input id="q" placeholder="Search title or description" style="flex:1; margin:0;" />
-      <button class="btn btn-primary" id="s">Search</button> 
-      <button class="btn btn-secondary" id="r">Reset</button>
+    ${pageHeader('Discovery Gallery', 'Discover visually striking interior design projects and save your inspirations.')}
+    
+    <div class="search-bar">
+      <input id="q" placeholder="Search styles, spaces, or designers..." style="flex:1;" />
+      <button class="btn btn-elegant" id="s">Search</button> 
+      <button class="btn btn-outline" id="r">Reset</button>
     </div>
     <div id="tb"></div>
   `);
 
   const reload = async q => {
-    const r = await api('/api/projects/public/search' + (q ? '?q=' + encodeURIComponent(q) : ''));
-    $('#tb').innerHTML = tbl(['project_id', 'title', 'company_name', 'status'], r.projects, p => `
-      <div class="actions">
-        <a href="#/browse/view/${p.project_id}" class="btn btn-primary">View</a>
-        <button class="btn btn-success" data-s2="${p.project_id}">Save</button>
-      </div>
-    `);
+    try {
+      const r = await api('/api/projects/public/search' + (q ? '?q=' + encodeURIComponent(q) : ''));
+      
+      if (r.projects.length === 0) {
+        $('#tb').innerHTML = '<p class="error">❌ No projects discovered matching criteria.</p>';
+      } else {
+        $('#tb').innerHTML = `<div class="data-grid">` + r.projects.map(p => `
+          <div class="data-card">
+            <img src="${p.image_url || 'https://via.placeholder.com/600x400?text=Premium+Design'}" alt="${esc(p.title)}">
+            <div class="data-info">
+              <div class="data-header">
+                <h3>${esc(p.title)}</h3>
+                <span class="badge ${p.status === 'Completed' ? 'badge-neutral' : 'badge-success'}">${esc(p.status)}</span>
+              </div>
+              <p class="meta-text" style="color:var(--primary); font-weight:500; font-size:0.8rem; text-transform:uppercase; letter-spacing:1px; margin-bottom:1rem;">By ${esc(p.company_name)}</p>
+              
+              <div class="actions" style="margin-top:auto; padding-top:1rem; border-top:1px solid #f0f0f0;">
+                <a href="#/browse/view/${p.project_id}" class="btn btn-elegant" style="flex: 1;">Explore Room</a>
+                <button class="btn btn-outline" data-s2="${p.project_id}" title="Save to Favourites" style="padding: 0.6rem;">⭐</button>
+              </div>
+            </div>
+          </div>
+        `).join('') + `</div>`;
+      }
+    } catch (ex) { alert(ex.message); }
   };
   
   $('#q').oninput = debounce(() => reload($('#q').value), 300);
@@ -745,11 +864,11 @@ async function browseList() {
   $('#r').onclick = () => { $('#q').value = ''; reload(); };
   
   $('#tb').onclick = async e => {
-    const si = e.target.getAttribute('data-s2');
-    if (si) {
+    const btn = e.target.closest('[data-s2]'); 
+    if (btn) {
       try {
-        await api('/api/favourites', { method: 'POST', body: JSON.stringify({ project_id: +si }) });
-        alert(`✅ Saved project #${si} to favourites!`);
+        await api('/api/favourites', { method: 'POST', body: JSON.stringify({ project_id: +btn.getAttribute('data-s2') }) });
+        alert(`✅ Saved to your personal inspiration gallery!`);
       } catch (ex) { alert(ex.message); }
     }
   };
@@ -760,40 +879,60 @@ async function browseView(id) {
   try {
     const r = await api('/api/projects/public/' + id);
     shell(`
-      <h1>Project Details</h1>
-      <div style="padding: 1rem; background: #f8fafc; border-radius: 6px;">
-        <p><strong>Title:</strong> ${esc(r.project.title)}</p>
-        <p><strong>Description:</strong> ${esc(r.project.description || 'N/A')}</p>
-        <p><strong>Status:</strong> ${esc(r.project.status)}</p>
-      </div>
-      <div class="actions" style="margin-top: 1rem;">
-        <a href="#/browse" class="btn btn-secondary">Back to Browse</a>
+      ${pageHeader('Room Exploration', esc(r.project.title))}
+      <div style="max-width: 900px; margin: 0 auto; background: #fff; border-radius: 8px; border: 1px solid #f0f0f0; overflow:hidden;">
+        <img src="${r.project.image_url || 'https://via.placeholder.com/900x500?text=Room+Preview'}" style="width:100%; height:400px; object-fit:cover; border-bottom:1px solid #eee;">
+        <div style="padding: 3rem;">
+          <p class="meta-text" style="font-size:1.2rem; margin-bottom:2rem; line-height:1.8; color:#444;">${esc(r.project.description || 'No conceptual narrative provided by designer.')}</p>
+          <div class="actions" style="justify-content:center;">
+            <a href="#/browse" class="btn btn-outline">Back to Gallery</a>
+          </div>
+        </div>
       </div>
     `);
-  } catch (ex) { shell(`<h1>Error</h1><p class="error">❌ ${ex.message}</p><a href="#/browse" class="btn btn-secondary">Back</a>`); }
+  } catch (ex) { shell(`<p class="error">❌ ${ex.message}</p>`); }
 }
 
 // =============================================================================
-// 8. CUSTOMER FAVOURITES (US #33 - #34) - Customer Only
+// 8. CUSTOMER FAVOURITES (Customer Only)
 // =============================================================================
 async function favouritesList() {
   shell(`
-    <h1>Favourite List</h1>
-    <div class="actions" style="margin-bottom: 1rem;">
-      <input id="q" placeholder="Search saved projects..." style="flex:1; margin:0;" />
-      <button class="btn btn-primary" id="s">Search</button> 
-      <button class="btn btn-secondary" id="r">Reset</button>
+    ${pageHeader('My Shortlists (Favourites)', 'Curate a personalized mood board of saved interior designs.')}
+    
+    <div class="search-bar">
+      <input id="q" placeholder="Filter inspirations..." style="flex:1;" />
+      <button class="btn btn-elegant" id="s">Search</button> 
+      <button class="btn btn-outline" id="r">Reset</button>
     </div>
     <div id="tb"></div>
   `);
 
   const reload = async q => {
-    const r = q ? await api('/api/favourites/search?q=' + encodeURIComponent(q)) : await api('/api/favourites');
-    $('#tb').innerHTML = tbl(['project_id', 'title', 'status', 'saved_at'], r.favourites, f => `
-      <div class="actions">
-        <button class="btn btn-danger" data-x="${f.project_id}">Remove</button>
-      </div>
-    `);
+    try {
+      const r = q ? await api('/api/favourites/search?q=' + encodeURIComponent(q)) : await api('/api/favourites');
+      
+      if (r.favourites.length === 0) {
+        $('#tb').innerHTML = '<p class="error">❌ Your inspiration board is currently empty.</p>';
+      } else {
+        $('#tb').innerHTML = `<div class="data-grid">` + r.favourites.map(f => `
+          <div class="data-card">
+            <img src="${f.image_url || 'https://via.placeholder.com/600x400?text=Inspiration'}" alt="${esc(f.title)}">
+            <div class="data-info">
+              <div class="data-header">
+                <h3>${esc(f.title)}</h3>
+              </div>
+              <p class="meta-text" style="font-size:0.8rem; margin-bottom:1rem;">Added: ${fmtDate(f.saved_at)}</p>
+              
+              <div class="actions" style="margin-top:auto; padding-top:1rem; border-top:1px solid #f0f0f0;">
+                <a href="#/browse/view/${f.project_id}" class="btn btn-elegant" style="flex: 1;">View Again</a>
+                <button class="btn btn-danger" data-x="${f.project_id}" style="border:none;">Remove</button>
+              </div>
+            </div>
+          </div>
+        `).join('') + `</div>`;
+      }
+    } catch (ex) { alert(ex.message); }
   };
   
   $('#q').oninput = debounce(() => reload($('#q').value), 300);
@@ -801,41 +940,57 @@ async function favouritesList() {
   $('#r').onclick = () => { $('#q').value = ''; reload(); };
   
   $('#tb').onclick = async e => {
-    const id = e.target.getAttribute('data-x'); if (!id) return;
-    try {
-      await api('/api/favourites/' + id, { method: 'DELETE' });
-      reload($('#q').value);
-    } catch (ex) { alert(ex.message); }
+    const btn = e.target.closest('[data-x]'); 
+    if (btn) {
+      try {
+        await api('/api/favourites/' + btn.getAttribute('data-x'), { method: 'DELETE' });
+        reload($('#q').value);
+      } catch (ex) { alert(ex.message); }
+    }
   };
   await reload();
 }
 
 // =============================================================================
-// 9. CATEGORIES (US #41 - #45) - Platform Manager Only
+// 9. CATEGORIES (Platform Manager Only)
 // =============================================================================
 async function categoriesList() {
-  let L = [];
   shell(`
-    <h1>IDP Categories</h1>
-    <div class="actions" style="margin-bottom: 1rem;">
-      <a href="#/categories/create" class="btn btn-primary">+ Create Category</a>
+    ${pageHeader('Taxonomy Management', 'Curate standard design categories ensuring systemic consistency.')}
+    <div class="actions" style="justify-content: center; margin-bottom: 2rem;">
+      <a href="#/categories/create" class="btn btn-elegant">+ Define Category</a>
     </div>
-    <div class="actions" style="margin-bottom: 1rem;">
-      <input id="q" placeholder="Search categories..." style="flex:1; margin:0;" />
-      <button class="btn btn-primary" id="s">Search</button>
-      <button class="btn btn-secondary" id="r">Reset</button>
+    <div class="search-bar">
+      <input id="q" placeholder="Search taxonomies..." style="flex:1;" />
+      <button class="btn btn-elegant" id="s">Search</button>
+      <button class="btn btn-outline" id="r">Reset</button>
     </div>
     <div id="tb"></div>
   `);
 
   const reload = async q => {
-    L = (q ? (await api('/api/categories/search?q=' + encodeURIComponent(q))) : (await api('/api/categories'))).categories;
-    $('#tb').innerHTML = tbl(['category_id', 'category_name', 'description'], L, c => `
-      <div class="actions">
-        <a href="#/categories/edit/${c.category_id}" class="btn btn-secondary">Edit</a> 
-        <button class="btn btn-danger" data-d="${c.category_id}">Delete</button>
-      </div>
-    `);
+    try {
+      const L = (q ? (await api('/api/categories/search?q=' + encodeURIComponent(q))) : (await api('/api/categories'))).categories;
+      
+      if (L.length === 0) {
+        $('#tb').innerHTML = '<p class="error">❌ No classification categories found.</p>';
+      } else {
+        $('#tb').innerHTML = `<div class="data-grid">` + L.map(c => `
+          <div class="data-card" style="padding: 1.5rem;">
+            <div class="data-header">
+              <h3 style="margin-bottom:1rem; font-size: 1.5rem;">${esc(c.category_name)}</h3>
+            </div>
+            <p class="meta-text" style="margin-bottom: 1.5rem;">${esc(c.description || 'No defining description provided.')}</p>
+            
+            <div class="actions" style="margin-top:auto; padding-top:1rem; border-top:1px solid #eee;">
+              <a href="#/categories/view/${c.category_id}" class="btn btn-outline" style="flex:1">View</a>
+              <a href="#/categories/edit/${c.category_id}" class="btn btn-outline" style="flex:1">Edit</a> 
+              <button class="btn btn-danger" data-d="${c.category_id}" style="border:none;">Delete</button>
+            </div>
+          </div>
+        `).join('') + `</div>`;
+      }
+    } catch (ex) { alert(ex.message); }
   };
   
   $('#q').oninput = debounce(() => reload($('#q').value), 300);
@@ -844,7 +999,7 @@ async function categoriesList() {
   
   $('#tb').onclick = async e => {
     const di = e.target.getAttribute('data-d');
-    if (di && confirm('Delete Category #' + di + '?')) {
+    if (di && confirm('Eradicate Category #' + di + '?')) {
       try {
         await api('/api/categories/' + di, { method: 'DELETE' });
         reload($('#q').value);
@@ -856,14 +1011,14 @@ async function categoriesList() {
 
 async function categoriesCreate() {
   shell(`
-    <h1>Create Category</h1>
-    <form id="f">
-      <div class="form-group"><label>Name</label><input name="category_name" required/></div>
-      <div class="form-group"><label>Description</label><textarea name="description" rows="2"></textarea></div>
+    ${pageHeader('Define Taxonomy', 'Standardize a new structural category for portfolios.')}
+    <form id="f" style="max-width: 600px; margin: 0 auto;">
+      <div class="form-group"><label>Classification Title</label><input name="category_name" required/></div>
+      <div class="form-group"><label>Architectural Description</label><textarea name="description" rows="4"></textarea></div>
       <p id="m" class="error"></p>
-      <div class="actions">
-        <button type="submit" class="btn btn-primary">Save Category</button> 
-        <a href="#/categories" class="btn btn-secondary">Cancel</a>
+      <div class="actions" style="justify-content: center; margin-top: 2rem;">
+        <button type="submit" class="btn btn-elegant">Save Classification</button> 
+        <a href="#/categories" class="btn btn-outline">Cancel</a>
       </div>
     </form>
   `);
@@ -879,18 +1034,34 @@ async function categoriesCreate() {
   };
 }
 
+async function categoriesView(id) {
+  try {
+    const r = await api('/api/categories/' + id);
+    shell(`
+      ${pageHeader('Taxonomy Rules', esc(r.category.category_name))}
+      <div style="max-width: 600px; margin: 0 auto; background: #fff; padding: 2rem; border-radius: 8px; border: 1px solid #f0f0f0;">
+        <p class="meta-text" style="font-size:1.1rem; margin-bottom:1rem;"><strong>Registry ID:</strong> #${r.category.category_id}</p>
+        <p class="meta-text" style="font-size:1.1rem; margin-bottom:1rem; white-space:pre-line;"><strong>Description:</strong><br>${esc(r.category.description || 'N/A')}</p>
+        <div class="actions" style="margin-top: 2rem; justify-content:center;">
+          <a href="#/categories" class="btn btn-outline">Return to Taxonomy List</a>
+        </div>
+      </div>
+    `);
+  } catch (ex) { shell(`<p class="error">❌ ${ex.message}</p>`); }
+}
+
 async function categoriesEdit(id) {
   try {
     const r = await api('/api/categories/' + id);
     shell(`
-      <h1>Edit Category: ${esc(r.category.category_name)}</h1>
-      <form id="f">
-        <div class="form-group"><label>Name</label><input name="category_name" value="${esc(r.category.category_name)}" required/></div>
-        <div class="form-group"><label>Description</label><textarea name="description" rows="2">${esc(r.category.description || '')}</textarea></div>
+      ${pageHeader('Refine Taxonomy', 'Amending ' + esc(r.category.category_name))}
+      <form id="f" style="max-width: 600px; margin: 0 auto;">
+        <div class="form-group"><label>Classification Title</label><input name="category_name" value="${esc(r.category.category_name)}" required/></div>
+        <div class="form-group"><label>Architectural Description</label><textarea name="description" rows="4">${esc(r.category.description || '')}</textarea></div>
         <p id="m" class="error"></p>
-        <div class="actions">
-          <button type="submit" class="btn btn-primary">Save Changes</button> 
-          <a href="#/categories" class="btn btn-secondary">Cancel</a>
+        <div class="actions" style="justify-content: center; margin-top: 2rem;">
+          <button type="submit" class="btn btn-elegant">Apply Revisions</button> 
+          <a href="#/categories" class="btn btn-outline">Cancel</a>
         </div>
       </form>
     `);
@@ -904,30 +1075,39 @@ async function categoriesEdit(id) {
         window.location.hash = '#/categories';
       } catch (ex) { showMsg('m', '❌ ' + ex.message, true); }
     };
-  } catch (ex) { shell(`<h1>Error</h1><p class="error">❌ ${ex.message}</p><a href="#/categories" class="btn btn-secondary">Back</a>`); }
+  } catch (ex) { shell(`<p class="error">❌ ${ex.message}</p>`); }
 }
 
 // =============================================================================
-// 10. REPORTS (US #46 - #48) - Platform Manager Only
+// 10. REPORTS (Platform Manager Only)
 // =============================================================================
 async function reports() {
   shell(`
-    <h1>Platform Reports</h1>
-    <div class="actions" style="margin-bottom: 1.5rem;">
-      <button class="btn btn-primary" data-p="daily">Daily Report</button> 
-      <button class="btn btn-primary" data-p="weekly">Weekly Report</button> 
-      <button class="btn btn-primary" data-p="monthly">Monthly Report</button>
+    ${pageHeader('Executive Platform Analytics', 'Synthesize total ecosystem performance including acquisition & engagement.')}
+    
+    <div class="actions" style="justify-content: center; margin-bottom: 2rem;">
+      <button class="btn btn-elegant" data-p="daily">Daily Pulse</button> 
+      <button class="btn btn-elegant" data-p="weekly">Weekly Rollup</button> 
+      <button class="btn btn-elegant" data-p="monthly">Monthly Synthesis</button>
     </div>
     
-    <h2 id="t">Select a report period above</h2>
+    <h2 id="t" style="text-align:center; font-weight:300; margin-bottom:2rem;">Awaiting Generation Parameters</h2>
     <p id="m" class="error"></p>
-    <div id="sm" style="background: #f8fafc; padding: 1.5rem; border-radius: 8px; margin-bottom: 2rem;"></div>
-    
-    <h2>Top Performing Projects</h2>
-    <table>
-      <thead><tr><th>Project</th><th>Views</th></tr></thead>
-      <tbody id="tb"></tbody>
-    </table>
+    <div id="sm"></div>
+    <div id="tb-wrap" style="display:none; margin-top:3rem;">
+      <h2 style="font-weight:400; font-size:1.5rem; margin-bottom:1rem;">Leaderboard: Traffic & Engagement</h2>
+      <table>
+        <thead>
+          <tr>
+            <th>Published Asset</th>
+            <th>Operating Entity</th>
+            <th>Traffic (Views)</th>
+            <th>Conversions (Saves)</th>
+          </tr>
+        </thead>
+        <tbody id="tb"></tbody>
+      </table>
+    </div>
   `);
   
   app().onclick = async e => {
@@ -935,19 +1115,40 @@ async function reports() {
     showMsg('m', 'Generating report...', false);
     try {
       const r = await api('/api/reports/' + p);
-      $('#t').textContent = p.toUpperCase() + ' Performance Report';
+      $('#t').textContent = p.toUpperCase() + ' PERFORMANCE SYNTHESIS';
       
       $('#sm').innerHTML = `
-        <div style="display:flex; gap:2rem; flex-wrap:wrap;">
-          <div><span style="color:var(--text-muted); font-size:0.9rem;">New Users</span><br><strong style="font-size:1.5rem;">${r.summary.new_users}</strong></div>
-          <div><span style="color:var(--text-muted); font-size:0.9rem;">Project Views</span><br><strong style="font-size:1.5rem;">${r.summary.project_views}</strong></div>
-          <div><span style="color:var(--text-muted); font-size:0.9rem;">Shortlists</span><br><strong style="font-size:1.5rem;">${r.summary.shortlists}</strong></div>
-          <div><span style="color:var(--text-muted); font-size:0.9rem;">New Projects</span><br><strong style="font-size:1.5rem;">${r.summary.new_projects}</strong></div>
+        <div class="data-grid" style="grid-template-columns: repeat(4, 1fr); margin-top:0;">
+          <div class="data-card" style="padding: 2rem; text-align:center; border-top: 4px solid var(--primary);">
+            <span style="color:var(--text-muted); font-size:0.9rem; text-transform:uppercase; letter-spacing:1px;">User Acquisition</span><br>
+            <strong style="font-size:3rem; font-weight:300;">${r.summary.new_users}</strong>
+          </div>
+          <div class="data-card" style="padding: 2rem; text-align:center; border-top: 4px solid var(--primary);">
+            <span style="color:var(--text-muted); font-size:0.9rem; text-transform:uppercase; letter-spacing:1px;">Traffic Volume</span><br>
+            <strong style="font-size:3rem; font-weight:300;">${r.summary.project_views}</strong>
+          </div>
+          <div class="data-card" style="padding: 2rem; text-align:center; border-top: 4px solid var(--primary);">
+            <span style="color:var(--text-muted); font-size:0.9rem; text-transform:uppercase; letter-spacing:1px;">Lead Intent (Saves)</span><br>
+            <strong style="font-size:3rem; font-weight:300;">${r.summary.shortlists}</strong>
+          </div>
+          <div class="data-card" style="padding: 2rem; text-align:center; border-top: 4px solid var(--primary);">
+            <span style="color:var(--text-muted); font-size:0.9rem; text-transform:uppercase; letter-spacing:1px;">Asset Velocity</span><br>
+            <strong style="font-size:3rem; font-weight:300;">${r.summary.new_projects}</strong>
+          </div>
         </div>
       `;
       
-      $('#tb').innerHTML = r.topProjects.map(x => `<tr><td>${esc(x.title)}</td><td>${x.views}</td></tr>`).join('');
-      showMsg('m', '✅ Report generated successfully!', false);
+      $('#tb-wrap').style.display = 'block';
+      $('#tb').innerHTML = r.topProjects.map(x => `
+        <tr>
+          <td style="font-weight:500;">${esc(x.title)}</td>
+          <td style="color:var(--text-muted);">${esc(x.company_name)}</td>
+          <td><span class="badge badge-neutral">👁️ ${x.views}</span></td>
+          <td><span class="badge badge-success">⭐ ${x.shortlists}</span></td>
+        </tr>
+      `).join('');
+      
+      showMsg('m', '', false);
     } catch (ex) { showMsg('m', '❌ ' + ex.message, true); }
   };
 }
@@ -1008,6 +1209,7 @@ async function route() {
   if (r === 'Platform Manager') {
     if (page === 'categories') {
       if (action === 'create') return categoriesCreate();
+      if (action === 'view') return categoriesView(id);
       if (action === 'edit') return categoriesEdit(id);
       return categoriesList();
     }
