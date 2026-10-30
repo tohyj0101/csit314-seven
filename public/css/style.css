@@ -76,7 +76,7 @@ nav button:hover { background-color: white; color: black; }
   padding: 0 2rem;
 }
 
-/* Page Headers (For Lecturer Descriptions) */
+/* Page Headers */
 .page-header {
   text-align: center;
   margin-bottom: 3rem;
@@ -263,3 +263,45 @@ th { background-color: #f8fafc; font-weight: 600; color: var(--text-muted); text
 tr:last-child td { border-bottom: none; }
 
 .error { color: var(--danger); font-weight: 500; text-align: center; padding: 2rem; }
+
+/* =========================================
+   LARGE NOTIFICATIONS (Full-Width Banner)
+   ========================================= */
+#toast-container {
+  position: fixed;
+  top: 0;
+  left: 0;
+  width: 100%;
+  z-index: 9999;
+  display: flex;
+  flex-direction: column;
+}
+
+.toast {
+  background-color: #10b981; /* Green */
+  color: white;
+  padding: 1.5rem 2rem;
+  font-size: 1.25rem; /* Large text */
+  font-weight: 600;
+  text-align: center;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  gap: 15px;
+  box-shadow: 0 4px 15px rgba(0,0,0,0.2);
+  animation: slideDown 0.4s ease-out forwards;
+}
+
+.toast.error {
+  background-color: #ef4444;
+}
+
+@keyframes slideDown {
+  from { transform: translateY(-100%); }
+  to { transform: translateY(0); }
+}
+
+@keyframes fadeOut {
+  from { opacity: 1; }
+  to { opacity: 0; }
+}

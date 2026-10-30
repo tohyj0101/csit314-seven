@@ -44,6 +44,39 @@ function debounce(func, delay) {
   };
 }
 
+// --- Toast Notification Helpers ---
+function showToast(msg, isError = false) {
+  let container = document.getElementById('toast-container');
+  if (!container) {
+    container = document.createElement('div');
+    container.id = 'toast-container';
+    document.body.appendChild(container);
+  }
+  
+  const toast = document.createElement('div');
+  toast.className = `toast ${isError ? 'error' : ''}`;
+  toast.innerHTML = `${isError ? '❌' : '✅'} ${msg}`;
+  
+  container.appendChild(toast);
+  
+  setTimeout(() => {
+    toast.style.animation = 'fadeOut 0.5s ease-in forwards';
+    setTimeout(() => toast.remove(), 500);
+  }, 3500);
+}
+
+function flash(msg) {
+  sessionStorage.setItem('flashMsg', msg);
+}
+
+function checkFlash() {
+  const msg = sessionStorage.getItem('flashMsg');
+  if (msg) {
+    showToast(msg);
+    sessionStorage.removeItem('flashMsg');
+  }
+}
+
 function showMsg(id, text, isError) {
   const el = $('#' + id);
   if (!el) return;
@@ -120,6 +153,7 @@ async function dashboard() {
 // 3. USER ACCOUNTS (Admin Only)
 // =============================================================================
 async function adminList() {
+  checkFlash();
   shell(`${pageHeader('User Account Management', 'Manage platform users, roles, and account statuses.')} <div class="actions" style="justify-content: center; margin-bottom: 2rem;"> <a href="#/admin/create" class="btn btn-elegant">+ Create New User Account</a> </div> <div class="search-bar"> <input id="q" placeholder="Search by username or email..." style="flex:1;" /> <button class="btn btn-elegant" id="s">Search</button> <button class="btn btn-outline" id="r">Reset</button> </div> <div id="tb"></div>`);
   
   const reload = async q => {
@@ -144,6 +178,7 @@ async function adminList() {
       if (!confirm(`Are you sure you want to ${st === 'Active' ? 'suspend' : 'activate'} this user account?`)) return;
       try {
         await api('/api/users/' + s + '/' + (st === 'Active' ? 'suspend' : 'activate'), { method: 'PATCH' });
+        showToast(`User Account ${st === 'Active' ? 'suspended' : 'activated'} successfully!`);
         reload($('#q').value);
       } catch (ex) { alert(ex.message); }
     }
@@ -162,6 +197,7 @@ async function adminCreate() {
     showMsg('m', 'Saving...', false);
     try {
       await api('/api/users', { method: 'POST', body: JSON.stringify(b) });
+      flash('User Account created successfully!');
       window.location.hash = '#/admin';
     } catch (ex) { showMsg('m', '❌ ' + ex.message, true); }
   };
@@ -178,7 +214,7 @@ async function adminEdit(id) {
   try {
     const r = await api('/api/users/' + id);
     const P = (await api('/api/profiles')).profiles;
-    shell(`${pageHeader('Update User Account', 'Modify credentials and profile assignments for ' + esc(r.user.username))} <form id="cf" style="max-width: 600px; margin: 0 auto;"> <div class="form-group"><label>Username</label><input name="username" value="${esc(r.user.username)}" required /></div> <div class="form-group"><label>Email</label><input name="email" type="email" value="${esc(r.user.email)}" required /></div> <div class="form-group"><label>Reset Password (leave blank to keep current)</label><input name="password" type="password" placeholder="New Password..." /></div> <div class="form-group"> <label>Assign User Profile</label> <select name="profile_id"> ${P.map(p => `<option value="${p.profile_id}" ${p.profile_id === r.user.profile_id ? 'selected' : ''}>${esc(p.profile_name)}</option>`).join('')} </select> </div> <p id="m" class="error"></p> <div class="actions" style="justify-content: center; margin-top: 2rem;"> <button type="submit" class="btn btn-elegant">Commit Changes</button> <a href="#/admin" class="btn btn-outline">Cancel</a> </div> </form>`);
+    shell(`${pageHeader('Update User Account', 'Modify credentials and profile assignments for ' + esc(r.user.username))} <form id="cf" style="max-width: 600px; margin: 0 auto;"> <div class="form-group"><label>Username</label><input name="username" value="${esc(r.user.username)}" required /></div> <div class="form-group"><label>Email</label><input name="email" type="email" value="${esc(r.user.email)}" required /></div> <div class="form-group"><label>Reset Password (leave blank to keep current)</label><input name="password" type="password" placeholder="New Password..." /></div> <div class="form-group"> <label>Assign User Profile</label> <select name="profile_id"> ${P.map(p => `<option value="${p.profile_id}" ${p.profile_id === r.user.profile_id ? 'selected' : ''}>${esc(p.profile_name)}</option>`).join('')} </select> </div> <p id="m" class="error"></p> <div class="actions" style="justify-content: center; margin-top: 2rem;"> <button type="submit" class="btn btn-elegant">Update User Account</button> <a href="#/admin" class="btn btn-outline">Cancel</a> </div> </form>`);
     
     $('#cf').onsubmit = async e => {
       e.preventDefault();
@@ -187,6 +223,7 @@ async function adminEdit(id) {
       showMsg('m', 'Saving...', false);
       try {
         await api('/api/users/' + id, { method: 'PUT', body: JSON.stringify(b) });
+        flash('User Account updated successfully!');
         window.location.hash = '#/admin';
       } catch (ex) { showMsg('m', '❌ ' + ex.message, true); }
     };
@@ -197,6 +234,7 @@ async function adminEdit(id) {
 // 4. USER PROFILES (Admin Only)
 // =============================================================================
 async function profilesList() {
+  checkFlash();
   shell(`${pageHeader('User Profiles', 'Manage platform roles and their granular system permissions.')} <div class="actions" style="justify-content: center; margin-bottom: 2rem;"> <a href="#/profiles/create" class="btn btn-elegant">+ Create New User Profile</a> </div> <div class="search-bar"> <input id="q" placeholder="Search profile titles..." style="flex:1;" /> <button class="btn btn-elegant" id="s">Search</button> <button class="btn btn-outline" id="r">Reset</button> </div> <div id="tb"></div>`);
   
   const reload = async (q) => {
@@ -221,6 +259,7 @@ async function profilesList() {
       if (!confirm(`Are you sure you want to ${sStatus === 'Active' ? 'suspend' : 'activate'} this profile?`)) return;
       try {
         await api('/api/profiles/' + sId + '/' + (sStatus === 'Active' ? 'suspend' : 'activate'), { method: 'PATCH' });
+        showToast(`User Profile ${sStatus === 'Active' ? 'suspended' : 'activated'} successfully!`);
         reload($('#q').value);
       } catch(ex) { alert(ex.message); }
     }
@@ -241,6 +280,7 @@ async function profilesCreate() {
     showMsg('m', 'Saving...', false);
     try {
       await api('/api/profiles', { method: 'POST', body: JSON.stringify({ profile_name, permissions: checkedPerms }) });
+      flash('User Profile created successfully!');
       window.location.hash = '#/profiles';
     } catch(ex) { showMsg('m', '❌ ' + ex.message, true); }
   };
@@ -274,7 +314,7 @@ async function profilesEdit(id) {
          </div>
          <p id="m" class="error"></p>
          <div class="actions" style="justify-content: center; margin-top: 2rem;">
-           <button type="submit" class="btn btn-elegant">Commit Changes</button>
+           <button type="submit" class="btn btn-elegant">Update User Profile</button>
            <a href="#/profiles" class="btn btn-outline">Cancel</a>
          </div>
        </form>
@@ -287,6 +327,7 @@ async function profilesEdit(id) {
        showMsg('m', 'Saving...', false);
        try {
          await api('/api/profiles/' + id, { method: 'PUT', body: JSON.stringify({ profile_name, permissions: checkedPerms }) });
+         flash('User Profile updated successfully!');
          window.location.hash = '#/profiles';
        } catch(ex) { showMsg('m', '❌ ' + ex.message, true); }
      };
@@ -297,6 +338,7 @@ async function profilesEdit(id) {
 // 5. COMPANY INFORMATION (Designer Only)
 // =============================================================================
 async function companiesList() {
+  checkFlash();
   shell(`${pageHeader('Company Directory', 'Manage your associated business entities before attaching projects.')} <div class="actions" style="justify-content: center; margin-bottom: 2rem;"> <a href="#/companies/create" class="btn btn-elegant">+ Register Company</a> </div> <div class="search-bar"> <input id="q" placeholder="Search business names or locations..." style="flex:1;" /> <button class="btn btn-elegant" id="s">Search</button> <button class="btn btn-outline" id="r">Reset</button> </div> <div id="tb"></div>`);
   
   const reload = async q => {
@@ -330,6 +372,7 @@ async function companiesList() {
     if (di && confirm('Permanently remove Company #' + di + '? All attached projects will fail if restricted.')) {
       try {
         await api('/api/companies/' + di, { method: 'DELETE' });
+        showToast('Company Information deleted successfully!');
         reload($('#q').value);
       } catch (ex) { alert(ex.message); }
     }
@@ -346,6 +389,7 @@ async function companiesCreate() {
     showMsg('m', 'Saving...', false);
     try {
       await api('/api/companies', { method: 'POST', body: JSON.stringify(b) });
+      flash('Company Information created successfully!');
       window.location.hash = '#/companies';
     } catch (ex) { showMsg('m', '❌ ' + ex.message, true); }
   };
@@ -361,7 +405,7 @@ async function companiesView(id) {
 async function companiesEdit(id) {
   try {
     const r = await api('/api/companies/' + id);
-    shell(`${pageHeader('Update Company Information', 'Updating details for ' + esc(r.company.company_name))} <form id="f" style="max-width: 600px; margin: 0 auto;"> <div class="form-group"><label>Company name</label><input name="company_name" value="${esc(r.company.company_name)}" required/></div> <div class="form-group"><label>Address</label><input name="address" value="${esc(r.company.address || '')}"/></div> <div class="form-group"><label>Contact</label><input name="contact_no" value="${esc(r.company.contact_no || '')}"/></div> <p id="m" class="error"></p> <div class="actions" style="justify-content: center; margin-top: 2rem;"> <button type="submit" class="btn btn-elegant">Commit Changes</button> <a href="#/companies" class="btn btn-outline">Cancel</a> </div> </form>`);
+    shell(`${pageHeader('Update Company Information', 'Updating details for ' + esc(r.company.company_name))} <form id="f" style="max-width: 600px; margin: 0 auto;"> <div class="form-group"><label>Company name</label><input name="company_name" value="${esc(r.company.company_name)}" required/></div> <div class="form-group"><label>Address</label><input name="address" value="${esc(r.company.address || '')}"/></div> <div class="form-group"><label>Contact</label><input name="contact_no" value="${esc(r.company.contact_no || '')}"/></div> <p id="m" class="error"></p> <div class="actions" style="justify-content: center; margin-top: 2rem;"> <button type="submit" class="btn btn-elegant">Update Company Information</button> <a href="#/companies" class="btn btn-outline">Cancel</a> </div> </form>`);
     
     $('#f').onsubmit = async e => {
       e.preventDefault();
@@ -369,6 +413,7 @@ async function companiesEdit(id) {
       showMsg('m', 'Saving...', false);
       try {
         await api('/api/companies/' + id, { method: 'PUT', body: JSON.stringify(b) });
+        flash('Company Information updated successfully!');
         window.location.hash = '#/companies';
       } catch (ex) { showMsg('m', '❌ ' + ex.message, true); }
     };
@@ -379,6 +424,7 @@ async function companiesEdit(id) {
 // 6. PROJECTS (Designer Only)
 // =============================================================================
 async function projectsList() {
+  checkFlash();
   let CS = (await api('/api/companies')).companies;
   if (!CS.length) return shell(pageHeader('Project Workspace', '❌ Please register a company first.') + `<div style="text-align:center;"><a href="#/companies/create" class="btn btn-elegant">Register Company</a></div>`);
   
@@ -394,7 +440,7 @@ async function projectsList() {
         <label style="font-size:0.8rem;">Operating Entity</label>
         <select id="sel">${CS.map(c => `<option value="${c.company_id}" ${c.company_id == cur ? 'selected' : ''}>${esc(c.company_name)}</option>`).join('')}</select>
       </div>
-      <a href="#/projects/create" class="btn btn-elegant">+ Publish Project</a>
+      <a href="#/projects/create" class="btn btn-elegant">+ Create New Project</a>
     </div>
     <div class="search-bar">
       <input id="q" placeholder="Search portfolio..." style="flex:1;" />
@@ -461,6 +507,7 @@ async function projectsList() {
     if (di && confirm('Permanently remove Project #' + di + '?')) {
       try {
         await api('/api/projects/' + di, { method: 'DELETE' });
+        showToast('Project deleted successfully!');
         reload($('#q').value);
       } catch (ex) { alert(ex.message); }
     }
@@ -481,6 +528,7 @@ async function projectsCreate() {
     showMsg('m', 'Publishing...', false);
     try {
       await api('/api/projects', { method: 'POST', body: JSON.stringify(b) });
+      flash('Project created successfully!');
       window.location.hash = '#/projects';
     } catch (ex) { showMsg('m', '❌ ' + ex.message, true); }
   };
@@ -496,7 +544,7 @@ async function projectsView(id) {
 async function projectsEdit(id) {
   try {
     const r = await api('/api/projects/' + id);
-    shell(`${pageHeader('Update Project Details', 'Updating parameters for ' + esc(r.project.title))} <form id="f" style="max-width: 600px; margin: 0 auto;"> <div class="form-group"><label>Project Title</label><input name="title" value="${esc(r.project.title)}" required/></div> <div class="form-group"><label>Design Narrative</label><textarea name="description" rows="4" required>${esc(r.project.description || '')}</textarea></div> <div class="form-group"> <label>Phase Status</label> <select name="status"> <option value="Ongoing" ${r.project.status === 'Ongoing' ? 'selected' : ''}>Ongoing</option> <option value="Completed" ${r.project.status === 'Completed' ? 'selected' : ''}>Completed</option> </select> </div> <div class="form-group"><label>Hero Image URL</label><input name="image_url" value="${esc(r.project.image_url || '')}"/></div> <p id="m" class="error"></p> <div class="actions" style="justify-content: center; margin-top: 2rem;"> <button type="submit" class="btn btn-elegant">Commit Revisions</button> <a href="#/projects" class="btn btn-outline">Cancel</a> </div> </form>`);
+    shell(`${pageHeader('Update Project Details', 'Updating parameters for ' + esc(r.project.title))} <form id="f" style="max-width: 600px; margin: 0 auto;"> <div class="form-group"><label>Project Title</label><input name="title" value="${esc(r.project.title)}" required/></div> <div class="form-group"><label>Design Narrative</label><textarea name="description" rows="4" required>${esc(r.project.description || '')}</textarea></div> <div class="form-group"> <label>Phase Status</label> <select name="status"> <option value="Ongoing" ${r.project.status === 'Ongoing' ? 'selected' : ''}>Ongoing</option> <option value="Completed" ${r.project.status === 'Completed' ? 'selected' : ''}>Completed</option> </select> </div> <div class="form-group"><label>Hero Image URL</label><input name="image_url" value="${esc(r.project.image_url || '')}"/></div> <p id="m" class="error"></p> <div class="actions" style="justify-content: center; margin-top: 2rem;"> <button type="submit" class="btn btn-elegant">Update Project Details</button> <a href="#/projects" class="btn btn-outline">Cancel</a> </div> </form>`);
     
     $('#f').onsubmit = async e => {
       e.preventDefault();
@@ -504,6 +552,7 @@ async function projectsEdit(id) {
       showMsg('m', 'Saving...', false);
       try {
         await api('/api/projects/' + id, { method: 'PUT', body: JSON.stringify(b) });
+        flash('Project updated successfully!');
         window.location.hash = '#/projects';
       } catch (ex) { showMsg('m', '❌ ' + ex.message, true); }
     };
@@ -559,7 +608,7 @@ async function browseList() {
     if (btn) {
       try {
         await api('/api/favourites', { method: 'POST', body: JSON.stringify({ project_id: +btn.getAttribute('data-s2') }) });
-        alert(`✅ Saved to your personal inspiration gallery!`);
+        showToast('Project saved to Favourites successfully!');
       } catch (ex) { alert(ex.message); }
     }
   };
@@ -577,6 +626,7 @@ async function browseView(id) {
 // 8. CUSTOMER FAVOURITES (Customer Only)
 // =============================================================================
 async function favouritesList() {
+  checkFlash();
   shell(`
     ${pageHeader('My Shortlists (Favourites)', 'Curate a personalized mood board of saved interior designs.')}
     <div class="search-bar">
@@ -621,6 +671,7 @@ async function favouritesList() {
     if (btn) {
       try {
         await api('/api/favourites/' + btn.getAttribute('data-x'), { method: 'DELETE' });
+        showToast('Project removed from Favourites successfully!');
         reload($('#q').value);
       } catch (ex) { alert(ex.message); }
     }
@@ -632,6 +683,7 @@ async function favouritesList() {
 // 9. CATEGORIES (Platform Manager Only)
 // =============================================================================
 async function categoriesList() {
+  checkFlash();
   shell(`${pageHeader('Taxonomy Management', 'Curate standard design categories ensuring systemic consistency.')} <div class="actions" style="justify-content: center; margin-bottom: 2rem;"> <a href="#/categories/create" class="btn btn-elegant">+ Create New Category</a> </div> <div class="search-bar"> <input id="q" placeholder="Search taxonomies..." style="flex:1;" /> <button class="btn btn-elegant" id="s">Search</button> <button class="btn btn-outline" id="r">Reset</button> </div> <div id="tb"></div>`);
   
   const reload = async q => {
@@ -666,6 +718,7 @@ async function categoriesList() {
     if (di && confirm('Eradicate Category #' + di + '?')) {
       try {
         await api('/api/categories/' + di, { method: 'DELETE' });
+        showToast('Category deleted successfully!');
         reload($('#q').value);
       } catch (ex) { alert(ex.message); }
     }
@@ -682,6 +735,7 @@ async function categoriesCreate() {
     showMsg('m', 'Saving...', false);
     try {
       await api('/api/categories', { method: 'POST', body: JSON.stringify(b) });
+      flash('Category created successfully!');
       window.location.hash = '#/categories';
     } catch (ex) { showMsg('m', '❌ ' + ex.message, true); }
   };
@@ -697,7 +751,7 @@ async function categoriesView(id) {
 async function categoriesEdit(id) {
   try {
     const r = await api('/api/categories/' + id);
-    shell(`${pageHeader('Update IDP Category', 'Amending ' + esc(r.category.category_name))} <form id="f" style="max-width: 600px; margin: 0 auto;"> <div class="form-group"><label>Classification Title</label><input name="category_name" value="${esc(r.category.category_name)}" required/></div> <div class="form-group"><label>Architectural Description</label><textarea name="description" rows="4">${esc(r.category.description || '')}</textarea></div> <p id="m" class="error"></p> <div class="actions" style="justify-content: center; margin-top: 2rem;"> <button type="submit" class="btn btn-elegant">Apply Revisions</button> <a href="#/categories" class="btn btn-outline">Cancel</a> </div> </form>`);
+    shell(`${pageHeader('Update IDP Category', 'Amending ' + esc(r.category.category_name))} <form id="f" style="max-width: 600px; margin: 0 auto;"> <div class="form-group"><label>Classification Title</label><input name="category_name" value="${esc(r.category.category_name)}" required/></div> <div class="form-group"><label>Architectural Description</label><textarea name="description" rows="4">${esc(r.category.description || '')}</textarea></div> <p id="m" class="error"></p> <div class="actions" style="justify-content: center; margin-top: 2rem;"> <button type="submit" class="btn btn-elegant">Update IDP Category</button> <a href="#/categories" class="btn btn-outline">Cancel</a> </div> </form>`);
     
     $('#f').onsubmit = async e => {
       e.preventDefault();
@@ -705,6 +759,7 @@ async function categoriesEdit(id) {
       showMsg('m', 'Saving...', false);
       try {
         await api('/api/categories/' + id, { method: 'PUT', body: JSON.stringify(b) });
+        flash('Category updated successfully!');
         window.location.hash = '#/categories';
       } catch (ex) { showMsg('m', '❌ ' + ex.message, true); }
     };
@@ -781,6 +836,7 @@ async function reports() {
         </tr>
       `).join('');
       showMsg('m', '', false);
+      showToast(`${p.charAt(0).toUpperCase() + p.slice(1)} report generated successfully!`);
     } catch (ex) { showMsg('m', '❌ ' + ex.message, true); }
   };
 }

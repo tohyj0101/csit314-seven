@@ -18,7 +18,7 @@ Follows the **Boundary-Control-Entity (BCE)** framework. Agile (Scrum) process.
 * **CI/CD:** GitHub Actions
 
 ### BCE Layer Structure
-* **Boundary (`src/bce/routes.php`)** — route table + RBAC middleware
+* **Boundary (`src/bce/boundary.php`)** — route table + RBAC middleware
 * **Control  (`src/bce/controllers.php`)** — validation, business rules, session/ownership checks
 * **Entity   (`src/bce/entities.php`)** — parameterized SQL via PDO (no SQL injection)
 
