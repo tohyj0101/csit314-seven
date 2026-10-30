@@ -1,0 +1,20 @@
+{
+  "name": "csit314/seven",
+  "description": "CSIT314 T04: Seven - Interior Designer Matching Platform (PHP)",
+  "type": "project",
+  "require": {
+    "php": ">=8.1",
+    "ext-pdo": "*",
+    "ext-pdo_pgsql": "*",
+    "ext-json": "*"
+  },
+  "require-dev": {
+    "phpunit/phpunit": "^10.5"
+  },
+  "scripts": {
+    "serve": "php -S localhost:8000 router.php",
+    "db:init": "psql -U postgres -d csit314_seven -f db/schema.sql",
+    "db:seed": "php db/seed.php",
+    "test": "phpunit"
+  }
+}

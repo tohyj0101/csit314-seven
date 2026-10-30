@@ -31,24 +31,25 @@ jobs:
       DB_USER: postgres
       DB_PASSWORD: postgres
       DB_NAME: csit314_seven_test
-      SESSION_SECRET: ci-secret
 
     steps:
       - uses: actions/checkout@v4
 
-      - uses: actions/setup-node@v4
+      - name: Setup PHP
+        uses: shivammathur/setup-php@v2
         with:
-          node-version: '20'
-          # Removed 'cache: npm' because it requires a package-lock.json file
+          php-version: '8.2'
+          extensions: pdo_pgsql, pgsql
+          tools: composer
 
       - name: Install dependencies
-        run: npm install
+        run: composer install --no-interaction --prefer-dist
 
       - name: Apply database schema
         run: PGPASSWORD=postgres psql -h localhost -U postgres -d csit314_seven_test -f db/schema.sql
 
       - name: Seed database
-        run: node db/seed.js
+        run: php db/seed.php
 
       - name: Run test suite
-        run: npm test -- --ci
+        run: vendor/bin/phpunit --testdox
