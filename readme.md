@@ -3,8 +3,6 @@
 An online platform designed to match renovation customers to interior designers, built for the
 **CSIT314 Software Development Methodologies** group project at the University of Wollongong.
 
-> PHP port of the original Node.js/Express implementation. Same BCE architecture, same REST API,
-> same PostgreSQL schema, same vanilla-JS SPA frontend.
 
 ## 🏗️ Architecture & Methodologies
 
