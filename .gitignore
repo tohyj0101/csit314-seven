@@ -2,4 +2,5 @@ vendor/
 .env
 composer.phar
 composer-setup.php
+phpunit.result.cache
 cloudflared.exe
