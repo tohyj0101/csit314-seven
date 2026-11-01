@@ -3,6 +3,8 @@
 An online platform designed to match renovation customers to interior designers, built for the
 **CSIT314 Software Development Methodologies** group project at the University of Wollongong.
 
+> PHP port of the original Node.js/Express implementation. Same BCE architecture, same REST API,
+> same PostgreSQL schema, same vanilla-JS SPA frontend.
 
 ## 🏗️ Architecture & Methodologies
 
@@ -23,14 +25,13 @@ Follows the **Boundary-Control-Entity (BCE)** framework. Agile (Scrum) process.
 ## 🚀 Getting Started
 
 ### Prerequisites
-* PHP ≥ 8.1 with `pdo_pgsql` and `pgsql` extensions
+* PHP ≥ 8.1 with `pdo_pgsql` and `pgsql` extensions enabled in `php.ini`
 * [Composer](https://getcomposer.org/)
 * PostgreSQL ≥ 14
 
-### 1. Install
+### 1. Install Dependencies
 
 ```bash
 git clone https://github.com/tohyj0101/csit314-seven.git
 cd csit314-seven
 composer install
-cp .env.example .env  # then edit DB_* if needed
