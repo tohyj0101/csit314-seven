@@ -36,6 +36,56 @@ const esc = s => String(s ?? '').replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': 
 const fmtDate = d => d ? new Date(d).toLocaleString('en-SG', { timeZone: 'Asia/Singapore', hour12: true }) : 'N/A';
 const $ = s => document.querySelector(s), app = () => $('#app');
 
+const PERMISSION_MAP = {
+  'user:manage': ['Create User Account', 'Update User Account', 'View User Account', 'Suspend User Account', 'Search User Account'],
+  'profile:manage': ['Create User Profile', 'Update User Profile', 'View User Profile', 'Suspend User Profile', 'Search User Profile'],
+  'company:manage': ['Create Company Information', 'View Company Information', 'Update Company Information', 'Delete Company Information', 'Search Company Information'],
+  'project:manage': ['Create Ongoing Project', 'Create Completed Project', 'View Project', 'Update Project', 'Delete Project', 'Search Project'],
+  'interest:view': ['View Number of Views', 'View Number of Shortlists'],
+  'project:view': ['Search Public Projects', 'View Public Projects'],
+  'favourite:manage': ['Save IDP to Favourites', 'Search Favourites List', 'View Favourites List'],
+  'category:manage': ['Create IDP Category', 'View IDP Category', 'Update IDP Category', 'Delete IDP Category', 'Search IDP Category'],
+  'report:generate': ['Generate Daily Reports', 'Generate Weekly Reports', 'Generate Monthly Reports']
+};
+
+function getPermissionLabel(p) {
+  const labels = {
+    'user:manage': 'Manage User Accounts',
+    'profile:manage': 'Manage User Profiles',
+    'company:manage': 'Manage Company Info',
+    'project:manage': 'Manage Projects',
+    'interest:view': 'View Interest Metrics',
+    'project:view': 'View Public Projects',
+    'favourite:manage': 'Manage Favourites',
+    'category:manage': 'Manage IDP Categories',
+    'report:generate': 'Generate Reports'
+  };
+  return labels[p] || p;
+}
+
+function parsePermissions(perms) {
+  let arr = [];
+  if (Array.isArray(perms)) {
+    arr = perms;
+  } else if (typeof perms === 'string') {
+    if (perms.startsWith('{') && perms.endsWith('}')) {
+      arr = perms.slice(1, -1).split(',').filter(Boolean);
+    } else {
+      arr = perms.split(',').map(s => s.trim()).filter(Boolean);
+    }
+  }
+  
+  let result = [];
+  arr.forEach(p => {
+    if (PERMISSION_MAP[p]) {
+      result.push(...PERMISSION_MAP[p]); 
+    } else {
+      result.push(p); 
+    }
+  });
+  return result;
+}
+
 function debounce(func, delay) {
   let timeout;
   return function (...args) {
@@ -44,7 +94,6 @@ function debounce(func, delay) {
   };
 }
 
-// --- Toast Notification Helpers ---
 function showToast(msg, isError = false) {
   let container = document.getElementById('toast-container');
   if (!container) {
@@ -94,10 +143,24 @@ const pageHeader = (title, desc) => `
 
 const shell = h => {
   const u = window.__user, links = [['#/', 'Dashboard']];
-  if (u.role === 'User Admin') links.push(['#/admin', 'User Accounts'], ['#/profiles', 'User Profiles']);
-  if (u.role === 'Interior Designer') links.push(['#/companies', 'Companies'], ['#/projects', 'Projects']);
-  if (u.role === 'Customer') links.push(['#/browse', 'Browse'], ['#/favourites', 'Favourites']);
-  if (u.role === 'Platform Manager') links.push(['#/categories', 'Categories'], ['#/reports', 'Reports']);
+  const perms = u.permissions || [];
+
+  if (perms.includes('user:manage') || perms.includes('profile:manage')) {
+    if (!links.find(l => l[0] === '#/admin')) links.push(['#/admin', 'User Accounts']);
+    if (!links.find(l => l[0] === '#/profiles')) links.push(['#/profiles', 'User Profiles']);
+  }
+  if (perms.includes('company:manage') || perms.includes('project:manage')) {
+    if (!links.find(l => l[0] === '#/companies')) links.push(['#/companies', 'Companies']);
+    if (!links.find(l => l[0] === '#/projects')) links.push(['#/projects', 'Projects']);
+  }
+  if (perms.includes('project:view') || perms.includes('favourite:manage')) {
+    if (!links.find(l => l[0] === '#/browse')) links.push(['#/browse', 'Browse']);
+    if (!links.find(l => l[0] === '#/favourites')) links.push(['#/favourites', 'Favourites']);
+  }
+  if (perms.includes('category:manage') || perms.includes('report:generate')) {
+    if (!links.find(l => l[0] === '#/categories')) links.push(['#/categories', 'Categories']);
+    if (!links.find(l => l[0] === '#/reports')) links.push(['#/reports', 'Reports']);
+  }
   
   app().innerHTML = `<nav> ${links.map(([h, l]) => `<a href="${h}">${l}</a>`).join('')} <button id="lo">Logout</button> </nav> <main class="card">${h}</main>`;
   
@@ -131,21 +194,33 @@ function login() {
 }
 
 async function dashboard() {
-  const role = window.__user.role;
+  const perms = window.__user.permissions || [];
   const name = esc(window.__user.username);
-  let content = '';
-  
-  if (role === 'User Admin') {
-    content = `${pageHeader(`Welcome, ${name}`, 'User Administration Dashboard')} <div class="data-grid" style="grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));"> <div class="data-card" style="padding: 2.5rem 2rem; text-align: center;"> <h3 style="margin-bottom: 1rem; font-size: 1.5rem;">User Accounts</h3> <p class="meta-text" style="margin-bottom: 2rem;">Manage platform users, reset credentials, and toggle account access.</p> <a href="#/admin" class="btn btn-elegant" style="width: 100%;">Manage User Accounts</a> </div> <div class="data-card" style="padding: 2.5rem 2rem; text-align: center;"> <h3 style="margin-bottom: 1rem; font-size: 1.5rem;">User Profiles</h3> <p class="meta-text" style="margin-bottom: 2rem;">Configure system roles and assign granular module permissions.</p> <a href="#/profiles" class="btn btn-elegant" style="width: 100%;">Manage User Profiles</a> </div> </div>`;
-  } else if (role === 'Interior Designer') {
-    content = `${pageHeader(`Welcome, ${name}`, 'Designer Workspace')} <div class="data-grid" style="grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));"> <div class="data-card" style="padding: 2.5rem 2rem; text-align: center;"> <h3 style="margin-bottom: 1rem; font-size: 1.5rem;">Portfolio Projects</h3> <p class="meta-text" style="margin-bottom: 2rem;">Upload new designs, track project status, and view engagement metrics.</p> <a href="#/projects" class="btn btn-elegant" style="width: 100%;">View Portfolio</a> </div> <div class="data-card" style="padding: 2.5rem 2rem; text-align: center;"> <h3 style="margin-bottom: 1rem; font-size: 1.5rem;">Company Entities</h3> <p class="meta-text" style="margin-bottom: 2rem;">Update your registered business details and contact information.</p> <a href="#/companies" class="btn btn-elegant" style="width: 100%;">Manage Companies</a> </div> </div>`;
-  } else if (role === 'Customer') {
-    content = `${pageHeader(`Welcome, ${name}`, 'Your Inspiration Hub')} <div class="data-grid" style="grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));"> <div class="data-card" style="padding: 2.5rem 2rem; text-align: center;"> <h3 style="margin-bottom: 1rem; font-size: 1.5rem;">Discovery Gallery</h3> <p class="meta-text" style="margin-bottom: 2rem;">Explore our curated collection of premium interior designs.</p> <a href="#/browse" class="btn btn-elegant" style="width: 100%;">Browse Designs</a> </div> <div class="data-card" style="padding: 2.5rem 2rem; text-align: center;"> <h3 style="margin-bottom: 1rem; font-size: 1.5rem;">My Favourites</h3> <p class="meta-text" style="margin-bottom: 2rem;">Review the rooms and projects you have saved to your mood board.</p> <a href="#/favourites" class="btn btn-elegant" style="width: 100%;">View Shortlists</a> </div> </div>`;
-  } else if (role === 'Platform Manager') {
-    content = `${pageHeader(`Welcome, ${name}`, 'Platform Management Dashboard')} <div class="data-grid" style="grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));"> <div class="data-card" style="padding: 2.5rem 2rem; text-align: center;"> <h3 style="margin-bottom: 1rem; font-size: 1.5rem;">Executive Reports</h3> <p class="meta-text" style="margin-bottom: 2rem;">Generate traffic, engagement, and user acquisition analytics.</p> <a href="#/reports" class="btn btn-elegant" style="width: 100%;">View Analytics</a> </div> <div class="data-card" style="padding: 2.5rem 2rem; text-align: center;"> <h3 style="margin-bottom: 1rem; font-size: 1.5rem;">Taxonomy</h3> <p class="meta-text" style="margin-bottom: 2rem;">Maintain the standard classification tags used across the platform.</p> <a href="#/categories" class="btn btn-elegant" style="width: 100%;">Manage Categories</a> </div> </div>`;
-  } else {
-    content = pageHeader(`Welcome, ${name}`, `You are logged in as a <strong>${esc(role)}</strong>. Use the top navigation bar to access your modules.`);
+  const roleName = esc(window.__user.role);
+  let cards = '';
+
+  if (perms.includes('user:manage') || perms.includes('profile:manage')) {
+    cards += `<div class="data-card" style="padding: 2.5rem 2rem; text-align: center;"> <h3 style="margin-bottom: 1rem; font-size: 1.5rem;">User Accounts</h3> <p class="meta-text" style="margin-bottom: 2rem;">Manage platform users, reset credentials, and toggle account access.</p> <a href="#/admin" class="btn btn-elegant" style="width: 100%;">Manage User Accounts</a> </div>`;
+    cards += `<div class="data-card" style="padding: 2.5rem 2rem; text-align: center;"> <h3 style="margin-bottom: 1rem; font-size: 1.5rem;">User Profiles</h3> <p class="meta-text" style="margin-bottom: 2rem;">Configure system roles and assign granular module permissions.</p> <a href="#/profiles" class="btn btn-elegant" style="width: 100%;">Manage User Profiles</a> </div>`;
   }
+  if (perms.includes('company:manage') || perms.includes('project:manage')) {
+    cards += `<div class="data-card" style="padding: 2.5rem 2rem; text-align: center;"> <h3 style="margin-bottom: 1rem; font-size: 1.5rem;">Portfolio Projects</h3> <p class="meta-text" style="margin-bottom: 2rem;">Upload new designs, track project status, and view engagement metrics.</p> <a href="#/projects" class="btn btn-elegant" style="width: 100%;">View Portfolio</a> </div>`;
+    cards += `<div class="data-card" style="padding: 2.5rem 2rem; text-align: center;"> <h3 style="margin-bottom: 1rem; font-size: 1.5rem;">Company Entities</h3> <p class="meta-text" style="margin-bottom: 2rem;">Update your registered business details and contact information.</p> <a href="#/companies" class="btn btn-elegant" style="width: 100%;">Manage Companies</a> </div>`;
+  }
+  if (perms.includes('project:view') || perms.includes('favourite:manage')) {
+    cards += `<div class="data-card" style="padding: 2.5rem 2rem; text-align: center;"> <h3 style="margin-bottom: 1rem; font-size: 1.5rem;">Discovery Gallery</h3> <p class="meta-text" style="margin-bottom: 2rem;">Explore our curated collection of premium interior designs.</p> <a href="#/browse" class="btn btn-elegant" style="width: 100%;">Browse Designs</a> </div>`;
+    cards += `<div class="data-card" style="padding: 2.5rem 2rem; text-align: center;"> <h3 style="margin-bottom: 1rem; font-size: 1.5rem;">My Favourites</h3> <p class="meta-text" style="margin-bottom: 2rem;">Review the rooms and projects you have saved to your mood board.</p> <a href="#/favourites" class="btn btn-elegant" style="width: 100%;">View Shortlists</a> </div>`;
+  }
+  if (perms.includes('category:manage') || perms.includes('report:generate')) {
+    cards += `<div class="data-card" style="padding: 2.5rem 2rem; text-align: center;"> <h3 style="margin-bottom: 1rem; font-size: 1.5rem;">Executive Reports</h3> <p class="meta-text" style="margin-bottom: 2rem;">Generate traffic, engagement, and user acquisition analytics.</p> <a href="#/reports" class="btn btn-elegant" style="width: 100%;">View Analytics</a> </div>`;
+    cards += `<div class="data-card" style="padding: 2.5rem 2rem; text-align: center;"> <h3 style="margin-bottom: 1rem; font-size: 1.5rem;">Taxonomy</h3> <p class="meta-text" style="margin-bottom: 2rem;">Maintain the standard classification tags used across the platform.</p> <a href="#/categories" class="btn btn-elegant" style="width: 100%;">Manage Categories</a> </div>`;
+  }
+  
+  if (!cards) {
+    cards = `<p class="error" style="grid-column: 1 / -1;">No modules have been assigned to your profile. Please contact the administrator.</p>`;
+  }
+
+  const content = `${pageHeader(`Welcome, ${name}`, `You are logged in as a <strong>${roleName}</strong>.`)} <div class="data-grid" style="grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));"> ${cards} </div>`;
   shell(content);
 }
 
@@ -159,10 +234,11 @@ async function adminList() {
   const reload = async q => {
     try {
       const u = (q ? await api('/api/users/search?q=' + encodeURIComponent(q)) : await api('/api/users')).users;
+      const tb = $('#tb'); if (!tb) return; // Race condition fix
       if (u.length === 0) {
-        $('#tb').innerHTML = '<p class="error">❌ No user accounts found.</p>';
+        tb.innerHTML = '<p class="error">❌ No user accounts found.</p>';
       } else {
-        $('#tb').innerHTML = `<div class="data-grid">` + u.map(x => `<div class="data-card"> <div class="data-info"> <div class="data-header"> <h3>${esc(x.username)}</h3> <span class="badge ${x.status === 'Active' ? 'badge-success' : 'badge-danger'}">${esc(x.status)}</span> </div> <p class="meta-text"><strong>Role:</strong> ${esc(x.profile_name)}</p> <p class="meta-text"><strong>Email:</strong> ${esc(x.email)}</p> <div class="actions" style="margin-top:auto; padding-top:1rem; border-top:1px solid #f0f0f0;"> <a href="#/admin/view/${x.account_id}" class="btn btn-outline" style="flex:1">View</a> <a href="#/admin/edit/${x.account_id}" class="btn btn-outline" style="flex:1">Update</a> <button class="btn btn-outline" data-s="${x.account_id}" data-st="${x.status}"> ${x.status === 'Active' ? 'Suspend' : 'Activate'} </button> </div> </div> </div>`).join('') + `</div>`;
+        tb.innerHTML = `<div class="data-grid">` + u.map(x => `<div class="data-card"> <div class="data-info"> <div class="data-header"> <h3>${esc(x.username)}</h3> <span class="badge ${x.status === 'Active' ? 'badge-success' : 'badge-danger'}">${esc(x.status)}</span> </div> <p class="meta-text"><strong>Role:</strong> ${esc(x.profile_name)}</p> <p class="meta-text"><strong>Email:</strong> ${esc(x.email)}</p> <div class="actions" style="margin-top:auto; padding-top:1rem; border-top:1px solid #f0f0f0;"> <a href="#/admin/view/${x.account_id}" class="btn btn-outline" style="flex:1">View</a> <a href="#/admin/edit/${x.account_id}" class="btn btn-outline" style="flex:1">Update</a> <button class="btn btn-outline" data-s="${x.account_id}" data-st="${x.status}"> ${x.status === 'Active' ? 'Suspend' : 'Activate'} </button> </div> </div> </div>`).join('') + `</div>`;
       }
     } catch (ex) { alert(ex.message); }
   };
@@ -240,10 +316,11 @@ async function profilesList() {
   const reload = async (q) => {
     try {
       const L = (q ? await api('/api/profiles/search?q=' + encodeURIComponent(q)) : await api('/api/profiles')).profiles;
+      const tb = $('#tb'); if (!tb) return; // Race condition fix
       if (L.length === 0) {
-        $('#tb').innerHTML = '<p class="error">❌ No profiles found.</p>';
+        tb.innerHTML = '<p class="error">❌ No profiles found.</p>';
       } else {
-        $('#tb').innerHTML = `<div class="data-grid">` + L.map(p => `<div class="data-card"> <div class="data-info"> <div class="data-header"> <h3>${esc(p.profile_name)}</h3> <span class="badge ${(p.status || 'Active') === 'Active' ? 'badge-success' : 'badge-danger'}">${esc(p.status || 'Active')}</span> </div> <p class="meta-text"><strong>ID:</strong> #${p.profile_id}</p> <div class="actions" style="margin-top:auto; padding-top:1rem; border-top:1px solid #f0f0f0;"> <a href="#/profiles/view/${p.profile_id}" class="btn btn-outline" style="flex:1">View</a> <a href="#/profiles/edit/${p.profile_id}" class="btn btn-outline" style="flex:1">Update</a> <button class="btn btn-outline" data-s="${p.profile_id}" data-st="${p.status || 'Active'}"> ${(p.status || 'Active') === 'Active' ? 'Suspend' : 'Activate'} </button> </div> </div> </div>`).join('') + `</div>`;
+        tb.innerHTML = `<div class="data-grid">` + L.map(p => `<div class="data-card"> <div class="data-info"> <div class="data-header"> <h3>${esc(p.profile_name)}</h3> <span class="badge ${(p.status || 'Active') === 'Active' ? 'badge-success' : 'badge-danger'}">${esc(p.status || 'Active')}</span> </div> <p class="meta-text"><strong>ID:</strong> #${p.profile_id}</p> <div class="actions" style="margin-top:auto; padding-top:1rem; border-top:1px solid #f0f0f0;"> <a href="#/profiles/view/${p.profile_id}" class="btn btn-outline" style="flex:1">View</a> <a href="#/profiles/edit/${p.profile_id}" class="btn btn-outline" style="flex:1">Update</a> <button class="btn btn-outline" data-s="${p.profile_id}" data-st="${p.status || 'Active'}"> ${(p.status || 'Active') === 'Active' ? 'Suspend' : 'Activate'} </button> </div> </div> </div>`).join('') + `</div>`;
       }
     } catch(ex) { alert(ex.message); }
   };
@@ -269,7 +346,10 @@ async function profilesList() {
 
 async function profilesCreate() {
   const perms = ['user:manage', 'profile:manage', 'company:manage', 'project:manage', 'interest:view', 'project:view', 'favourite:manage', 'category:manage', 'report:generate'];
-  const checkboxes = perms.map(p => `<label style="display:inline-flex; align-items:center; margin-right: 1.5rem; text-transform:none; font-weight:normal;"><input type="checkbox" name="permissions" value="${p}" style="width:auto; margin-right:8px;"> ${p}</label>`).join('');
+  const checkboxes = perms.map(p => {
+    const label = getPermissionLabel(p);
+    return `<label style="display:inline-flex; align-items:center; margin-right: 1.5rem; text-transform:none; font-weight:normal;"><input type="checkbox" name="permissions" value="${p}" style="width:auto; margin-right:8px;"> ${label}</label>`;
+  }).join('');
   
   shell(`${pageHeader('Create User Profile', 'Create a new role structure and attach system permissions.')} <form id="pf" style="max-width: 600px; margin: 0 auto;"> <div class="form-group"><label>Profile Designation (Name)</label><input name="profile_name" required placeholder="e.g. Senior Designer" /></div> <div class="form-group"> <label>System Permissions Grants</label> <div style="display:flex; flex-wrap:wrap; gap:0.5rem; background:#fff; padding:1.5rem; border:1px solid #ddd; border-radius:4px;"> ${checkboxes} </div> </div> <p id="m" class="error"></p> <div class="actions" style="justify-content: center; margin-top: 2rem;"> <button type="submit" class="btn btn-elegant">Create Profile</button> <a href="#/profiles" class="btn btn-outline">Cancel</a> </div> </form>`);
   
@@ -289,7 +369,7 @@ async function profilesCreate() {
 async function profilesView(id) {
   try {
     const r = await api('/api/profiles/' + id);
-    shell(`${pageHeader('View User Profile', 'Reviewing system grants for ' + esc(r.profile.profile_name))} <div style="max-width: 600px; margin: 0 auto; background: #fff; padding: 2rem; border-radius: 8px; border: 1px solid #f0f0f0;"> <p class="meta-text" style="font-size:1.1rem; margin-bottom:1rem;"><strong>ID:</strong> #${r.profile.profile_id}</p> <p class="meta-text" style="font-size:1.1rem; margin-bottom:1rem;"><strong>Designation:</strong> ${esc(r.profile.profile_name)}</p> <p class="meta-text" style="font-size:1.1rem; margin-bottom:1rem;"><strong>Status:</strong> <span class="badge ${(r.profile.status || 'Active') === 'Active' ? 'badge-success' : 'badge-danger'}">${esc(r.profile.status || 'Active')}</span></p> <p class="meta-text" style="font-size:1.1rem; margin-bottom:1rem;"><strong>System Grants:</strong><br><br> ${(r.profile.permissions || []).map(p => `<span class="badge badge-neutral" style="margin:4px;">${p}</span>`).join('') || 'None Assigned'}</p> <div class="actions" style="margin-top: 2rem; justify-content:center;"> <a href="#/profiles" class="btn btn-outline">Return to Directory</a> </div> </div>`);
+    shell(`${pageHeader('View User Profile', 'Reviewing system grants for ' + esc(r.profile.profile_name))} <div style="max-width: 600px; margin: 0 auto; background: #fff; padding: 2rem; border-radius: 8px; border: 1px solid #f0f0f0;"> <p class="meta-text" style="font-size:1.1rem; margin-bottom:1rem;"><strong>ID:</strong> #${r.profile.profile_id}</p> <p class="meta-text" style="font-size:1.1rem; margin-bottom:1rem;"><strong>Designation:</strong> ${esc(r.profile.profile_name)}</p> <p class="meta-text" style="font-size:1.1rem; margin-bottom:1rem;"><strong>Status:</strong> <span class="badge ${(r.profile.status || 'Active') === 'Active' ? 'badge-success' : 'badge-danger'}">${esc(r.profile.status || 'Active')}</span></p> <p class="meta-text" style="font-size:1.1rem; margin-bottom:1rem;"><strong>System Grants:</strong><br><br> ${parsePermissions(r.profile.permissions).map(p => `<span class="badge badge-neutral" style="margin:4px;">${p}</span>`).join('') || 'None Assigned'}</p> <div class="actions" style="margin-top: 2rem; justify-content:center;"> <a href="#/profiles" class="btn btn-outline">Return to Directory</a> </div> </div>`);
   } catch (ex) { shell(`<p class="error">❌ ${ex.message}</p><a href="#/profiles" class="btn btn-outline">Back</a>`); }
 }
 
@@ -297,9 +377,15 @@ async function profilesEdit(id) {
   try {
     const r = await api('/api/profiles/' + id);
     const perms = ['user:manage', 'profile:manage', 'company:manage', 'project:manage', 'interest:view', 'project:view', 'favourite:manage', 'category:manage', 'report:generate'];
+    
     const checkboxes = perms.map(p => {
-      const checked = (r.profile.permissions || []).includes(p) ? 'checked' : '';
-      return `<label style="display:inline-flex; align-items:center; margin-right: 1.5rem; text-transform:none; font-weight:normal;"><input type="checkbox" name="permissions" value="${p}" ${checked} style="width:auto; margin-right:8px;"> ${p}</label>`;
+      const isChecked = (r.profile.permissions || []).includes(p) || 
+                        (Array.isArray(r.profile.permissions) && r.profile.permissions.includes(p)) ||
+                        (typeof r.profile.permissions === 'string' && r.profile.permissions.includes(p));
+                        
+      const checked = isChecked ? 'checked' : '';
+      const label = getPermissionLabel(p);
+      return `<label style="display:inline-flex; align-items:center; margin-right: 1.5rem; text-transform:none; font-weight:normal;"><input type="checkbox" name="permissions" value="${p}" ${checked} style="width:auto; margin-right:8px;"> ${label}</label>`;
     }).join('');
     
     shell(`
@@ -344,10 +430,11 @@ async function companiesList() {
   const reload = async q => {
     try {
       const L = (q ? await api('/api/companies/search?q=' + encodeURIComponent(q)) : await api('/api/companies')).companies;
+      const tb = $('#tb'); if (!tb) return; // Race condition fix
       if (L.length === 0) {
-        $('#tb').innerHTML = '<p class="error">❌ No companies registered yet.</p>';
+        tb.innerHTML = '<p class="error">❌ No companies registered yet.</p>';
       } else {
-        $('#tb').innerHTML = `<div class="data-grid">` + L.map(c => `
+        tb.innerHTML = `<div class="data-grid">` + L.map(c => `
           <div class="data-card" style="padding: 1.5rem;">
             <h3 style="margin-bottom:1rem; font-size: 1.5rem; border-bottom: 1px solid #eee; padding-bottom:1rem;">${esc(c.company_name)}</h3>
             <p class="meta-text" style="display:flex; align-items:flex-start; gap:8px;"><strong>📍</strong> <span>${esc(c.address || 'Address Unlisted')}</span></p>
@@ -463,10 +550,11 @@ async function projectsList() {
       else if (st) u += '?status=' + st;
       
       L = (await api(u)).projects;
+      const tb = $('#tb'); if (!tb) return; // Race condition fix
       if (L.length === 0) {
-        $('#tb').innerHTML = '<p class="error">❌ Portfolio is empty for this criteria.</p>';
+        tb.innerHTML = '<p class="error">❌ Portfolio is empty for this criteria.</p>';
       } else {
-        $('#tb').innerHTML = `<div class="data-grid">` + L.map(p => {
+        tb.innerHTML = `<div class="data-grid">` + L.map(p => {
           const i = im[p.project_id] || { views: 0, shortlists: 0 };
           return `
             <div class="data-card">
@@ -576,10 +664,11 @@ async function browseList() {
   const reload = async q => {
     try {
       const r = await api('/api/projects/public/search' + (q ? '?q=' + encodeURIComponent(q) : ''));
+      const tb = $('#tb'); if (!tb) return; // Race condition fix
       if (r.projects.length === 0) {
-        $('#tb').innerHTML = '<p class="error">❌ No projects discovered matching criteria.</p>';
+        tb.innerHTML = '<p class="error">❌ No projects discovered matching criteria.</p>';
       } else {
-        $('#tb').innerHTML = `<div class="data-grid">` + r.projects.map(p => `
+        tb.innerHTML = `<div class="data-grid">` + r.projects.map(p => `
           <div class="data-card">
             <img src="${p.image_url || 'https://via.placeholder.com/600x400?text=Premium+Design'}" alt="${esc(p.title)}">
             <div class="data-info">
@@ -640,10 +729,11 @@ async function favouritesList() {
   const reload = async q => {
     try {
       const r = q ? await api('/api/favourites/search?q=' + encodeURIComponent(q)) : await api('/api/favourites');
+      const tb = $('#tb'); if (!tb) return; // Race condition fix
       if (r.favourites.length === 0) {
-        $('#tb').innerHTML = '<p class="error">❌ Your inspiration board is currently empty.</p>';
+        tb.innerHTML = '<p class="error">❌ Your inspiration board is currently empty.</p>';
       } else {
-        $('#tb').innerHTML = `<div class="data-grid">` + r.favourites.map(f => `
+        tb.innerHTML = `<div class="data-grid">` + r.favourites.map(f => `
           <div class="data-card">
             <img src="${f.image_url || 'https://via.placeholder.com/600x400?text=Inspiration'}" alt="${esc(f.title)}">
             <div class="data-info">
@@ -689,10 +779,11 @@ async function categoriesList() {
   const reload = async q => {
     try {
       const L = (q ? (await api('/api/categories/search?q=' + encodeURIComponent(q))) : (await api('/api/categories'))).categories;
+      const tb = $('#tb'); if (!tb) return; // Race condition fix
       if (L.length === 0) {
-        $('#tb').innerHTML = '<p class="error">❌ No classification categories found.</p>';
+        tb.innerHTML = '<p class="error">❌ No classification categories found.</p>';
       } else {
-        $('#tb').innerHTML = `<div class="data-grid">` + L.map(c => `
+        tb.innerHTML = `<div class="data-grid">` + L.map(c => `
           <div class="data-card" style="padding: 1.5rem;">
             <div class="data-header">
               <h3 style="margin-bottom:1rem; font-size: 1.5rem;">${esc(c.category_name)}</h3>
@@ -803,9 +894,11 @@ async function reports() {
     showMsg('m', 'Generating report...', false);
     try {
       const r = await api('/api/reports/' + p);
-      $('#t').textContent = p.toUpperCase() + ' PERFORMANCE SYNTHESIS';
+      const tEl = $('#t'); if (!tEl) return;
+      tEl.textContent = p.toUpperCase() + ' PERFORMANCE SYNTHESIS';
       
-      $('#sm').innerHTML = `
+      const smEl = $('#sm'); if (!smEl) return;
+      smEl.innerHTML = `
          <div class="data-grid" style="grid-template-columns: repeat(4, 1fr); margin-top:0;">
            <div class="data-card" style="padding: 2rem; text-align:center; border-top: 4px solid var(--primary);">
              <span style="color:var(--text-muted); font-size:0.9rem; text-transform:uppercase; letter-spacing:1px;">User Acquisition</span><br>
@@ -826,8 +919,11 @@ async function reports() {
          </div>
        `;
        
-      $('#tb-wrap').style.display = 'block';
-      $('#tb').innerHTML = r.topProjects.map(x => `
+      const tbWrap = $('#tb-wrap'); if (!tbWrap) return;
+      tbWrap.style.display = 'block';
+      
+      const tbEl = $('#tb'); if (!tbEl) return;
+      tbEl.innerHTML = r.topProjects.map(x => `
         <tr>
           <td style="font-weight:500;">${esc(x.title)}</td>
           <td style="color:var(--text-muted);">${esc(x.company_name)}</td>
@@ -854,9 +950,10 @@ async function route() {
   try { window.__user = (await api('/api/auth/me')).user; }
   catch (_) { return login(); }
   
-  const r = window.__user.role;
-  
-  if (r === 'User Admin') {
+  const perms = window.__user.permissions || [];
+
+  if (page === 'admin' || page === 'profiles') {
+    if (!perms.includes('user:manage') && !perms.includes('profile:manage')) return dashboard();
     if (page === 'admin') {
       if (action === 'create') return adminCreate();
       if (action === 'view') return adminView(id);
@@ -870,8 +967,9 @@ async function route() {
       return profilesList();
     }
   }
-  
-  if (r === 'Interior Designer') {
+
+  if (page === 'companies' || page === 'projects') {
+    if (!perms.includes('company:manage') && !perms.includes('project:manage')) return dashboard();
     if (page === 'companies') {
       if (action === 'create') return companiesCreate();
       if (action === 'view') return companiesView(id);
@@ -885,16 +983,18 @@ async function route() {
       return projectsList();
     }
   }
-  
-  if (r === 'Customer') {
+
+  if (page === 'browse' || page === 'favourites') {
+    if (!perms.includes('project:view') && !perms.includes('favourite:manage')) return dashboard();
     if (page === 'browse') {
       if (action === 'view') return browseView(id);
       return browseList();
     }
     if (page === 'favourites') return favouritesList();
   }
-  
-  if (r === 'Platform Manager') {
+
+  if (page === 'categories' || page === 'reports') {
+    if (!perms.includes('category:manage') && !perms.includes('report:generate')) return dashboard();
     if (page === 'categories') {
       if (action === 'create') return categoriesCreate();
       if (action === 'view') return categoriesView(id);
@@ -903,7 +1003,7 @@ async function route() {
     }
     if (page === 'reports') return reports();
   }
-  
+
   return dashboard();
 }
 
