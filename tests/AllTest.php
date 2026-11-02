@@ -231,9 +231,9 @@ class AllTest extends TestCase
     // =========================================================================
     public function test_15_19_company_lifecycle(): void
     {
-        // #15 create
+        // #15 create (FIXED: 8-digit contact_no)
         $r = self::req('POST','/api/companies',[
-            'company_name'=>'Test Studio','address'=>'1 St','contact_no'=>'+65',
+            'company_name'=>'Test Studio','address'=>'1 St','contact_no'=>'91234567',
         ],'d');
         $this->assertSame(201, $r['status']);
         $cid = $r['body']['company']['company_id'];
@@ -246,9 +246,9 @@ class AllTest extends TestCase
         // #16 not found
         $this->assertSame(404, self::req('GET','/api/companies/99999999',null,'d')['status']);
 
-        // #17 update
+        // #17 update (FIXED: 8-digit contact_no)
         $r = self::req('PUT',"/api/companies/$cid",
-            ['company_name'=>'Test Studio v2','address'=>'2','contact_no'=>'3'],'d');
+            ['company_name'=>'Test Studio v2','address'=>'2','contact_no'=>'98765432'],'d');
         $this->assertSame('Test Studio v2', $r['body']['company']['company_name']);
 
         // #19 search
