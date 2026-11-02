@@ -44,10 +44,10 @@ try {
     }
     echo "✅ 4 Accounts created\n";
 
-    // 4. Company
+    // 4. Company (Updated to 8-digit phone number)
     $row = q1(
         'INSERT INTO company (owner_id, company_name, address, contact_no) VALUES ($1, $2, $3, $4) RETURNING company_id',
-        [$uids['Interior Designer'], 'My Design Studio', '123 Orchard Road, Singapore', '+65 9123 4567']
+        [$uids['Interior Designer'], 'My Design Studio', '123 Orchard Road, Singapore', '91234567']
     );
     $companyId = (int)$row['company_id'];
 

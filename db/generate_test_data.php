@@ -36,12 +36,20 @@ for ($i = 1; $i <= 100; $i++) {
 }
 echo "✅ 100 Categories generated.\n";
 
-// 3. Generate 100 Companies
+// 3. Generate 100 Companies (Updated to 8-digit phone numbers)
 for ($i = 1; $i <= 100; $i++) {
     $name = "Synthetic Company " . $i;
     if (!q1("SELECT company_id FROM company WHERE company_name = $1", [$name])) {
         $owner = $designers[array_rand($designers)]['account_id'];
-        CompanyInfo::saveCompany(['owner_id' => $owner, 'company_name' => $name, 'address' => "Address $i", 'contact_no' => "+65 1234 $i"]);
+        // Generate a random 8-digit phone number starting with 8 or 9
+        $randomPhone = '8' . str_pad((string)rand(0, 9999999), 7, '0', STR_PAD_LEFT);
+        
+        CompanyInfo::saveCompany([
+            'owner_id' => $owner, 
+            'company_name' => $name, 
+            'address' => "Address $i", 
+            'contact_no' => $randomPhone
+        ]);
     }
 }
 echo "✅ 100 Companies generated.\n";

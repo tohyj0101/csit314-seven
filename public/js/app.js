@@ -20,7 +20,7 @@ async function api(u, o = {}) {
       if (r.status === 403) throw new Error('You do not have permission to perform this action.');
       if (r.status === 404) throw new Error('The requested item could not be found.');
       if (r.status === 409) throw new Error('A conflict occurred. The record might already exist.');
-      if (r.status === 500) throw new Error('The server encountered an issue. Please try again in a few moments.');
+      if (r.status === 500) throw new Error('The server encountered an issue. Please try again.');
       throw new Error('An unknown network error occurred.');
     }
     return b || {};
@@ -65,23 +65,15 @@ function getPermissionLabel(p) {
 
 function parsePermissions(perms) {
   let arr = [];
-  if (Array.isArray(perms)) {
-    arr = perms;
-  } else if (typeof perms === 'string') {
-    if (perms.startsWith('{') && perms.endsWith('}')) {
-      arr = perms.slice(1, -1).split(',').filter(Boolean);
-    } else {
-      arr = perms.split(',').map(s => s.trim()).filter(Boolean);
-    }
+  if (Array.isArray(perms)) { arr = perms; } 
+  else if (typeof perms === 'string') {
+    if (perms.startsWith('{') && perms.endsWith('}')) { arr = perms.slice(1, -1).split(',').filter(Boolean); }
+    else { arr = perms.split(',').map(s => s.trim()).filter(Boolean); }
   }
   
   let result = [];
   arr.forEach(p => {
-    if (PERMISSION_MAP[p]) {
-      result.push(...PERMISSION_MAP[p]); 
-    } else {
-      result.push(p); 
-    }
+    if (PERMISSION_MAP[p]) { result.push(...PERMISSION_MAP[p]); } else { result.push(p); }
   });
   return result;
 }
@@ -101,29 +93,20 @@ function showToast(msg, isError = false) {
     container.id = 'toast-container';
     document.body.appendChild(container);
   }
-  
   const toast = document.createElement('div');
   toast.className = `toast ${isError ? 'error' : ''}`;
   toast.innerHTML = `${isError ? '❌' : '✅'} ${msg}`;
-  
   container.appendChild(toast);
-  
   setTimeout(() => {
     toast.style.animation = 'fadeOut 0.5s ease-in forwards';
     setTimeout(() => toast.remove(), 500);
   }, 3500);
 }
 
-function flash(msg) {
-  sessionStorage.setItem('flashMsg', msg);
-}
-
+function flash(msg) { sessionStorage.setItem('flashMsg', msg); }
 function checkFlash() {
   const msg = sessionStorage.getItem('flashMsg');
-  if (msg) {
-    showToast(msg);
-    sessionStorage.removeItem('flashMsg');
-  }
+  if (msg) { showToast(msg); sessionStorage.removeItem('flashMsg'); }
 }
 
 function showMsg(id, text, isError) {
@@ -181,15 +164,12 @@ function login() {
     e.preventDefault();
     showMsg('m', 'Logging in...', false);
     const data = Object.fromEntries(new FormData(e.target));
-    
     try {
       const response = await api('/api/auth/login', { method: 'POST', body: JSON.stringify(data) });
       window.__user = response.user;
       route(); 
       if (window.location.hash !== '#/') window.location.hash = '#/';
-    } catch (ex) {
-      showMsg('m', '❌ ' + ex.message, true);
-    }
+    } catch (ex) { showMsg('m', '❌ ' + ex.message, true); }
   };
 }
 
@@ -234,10 +214,9 @@ async function adminList() {
   const reload = async q => {
     try {
       const u = (q ? await api('/api/users/search?q=' + encodeURIComponent(q)) : await api('/api/users')).users;
-      const tb = $('#tb'); if (!tb) return; // Race condition fix
-      if (u.length === 0) {
-        tb.innerHTML = '<p class="error">❌ No user accounts found.</p>';
-      } else {
+      const tb = $('#tb'); if (!tb) return;
+      if (u.length === 0) { tb.innerHTML = '<p class="error">❌ No user accounts found.</p>'; } 
+      else {
         tb.innerHTML = `<div class="data-grid">` + u.map(x => `<div class="data-card"> <div class="data-info"> <div class="data-header"> <h3>${esc(x.username)}</h3> <span class="badge ${x.status === 'Active' ? 'badge-success' : 'badge-danger'}">${esc(x.status)}</span> </div> <p class="meta-text"><strong>Role:</strong> ${esc(x.profile_name)}</p> <p class="meta-text"><strong>Email:</strong> ${esc(x.email)}</p> <div class="actions" style="margin-top:auto; padding-top:1rem; border-top:1px solid #f0f0f0;"> <a href="#/admin/view/${x.account_id}" class="btn btn-outline" style="flex:1">View</a> <a href="#/admin/edit/${x.account_id}" class="btn btn-outline" style="flex:1">Update</a> <button class="btn btn-outline" data-s="${x.account_id}" data-st="${x.status}"> ${x.status === 'Active' ? 'Suspend' : 'Activate'} </button> </div> </div> </div>`).join('') + `</div>`;
       }
     } catch (ex) { alert(ex.message); }
@@ -316,10 +295,9 @@ async function profilesList() {
   const reload = async (q) => {
     try {
       const L = (q ? await api('/api/profiles/search?q=' + encodeURIComponent(q)) : await api('/api/profiles')).profiles;
-      const tb = $('#tb'); if (!tb) return; // Race condition fix
-      if (L.length === 0) {
-        tb.innerHTML = '<p class="error">❌ No profiles found.</p>';
-      } else {
+      const tb = $('#tb'); if (!tb) return;
+      if (L.length === 0) { tb.innerHTML = '<p class="error">❌ No profiles found.</p>'; } 
+      else {
         tb.innerHTML = `<div class="data-grid">` + L.map(p => `<div class="data-card"> <div class="data-info"> <div class="data-header"> <h3>${esc(p.profile_name)}</h3> <span class="badge ${(p.status || 'Active') === 'Active' ? 'badge-success' : 'badge-danger'}">${esc(p.status || 'Active')}</span> </div> <p class="meta-text"><strong>ID:</strong> #${p.profile_id}</p> <div class="actions" style="margin-top:auto; padding-top:1rem; border-top:1px solid #f0f0f0;"> <a href="#/profiles/view/${p.profile_id}" class="btn btn-outline" style="flex:1">View</a> <a href="#/profiles/edit/${p.profile_id}" class="btn btn-outline" style="flex:1">Update</a> <button class="btn btn-outline" data-s="${p.profile_id}" data-st="${p.status || 'Active'}"> ${(p.status || 'Active') === 'Active' ? 'Suspend' : 'Activate'} </button> </div> </div> </div>`).join('') + `</div>`;
       }
     } catch(ex) { alert(ex.message); }
@@ -369,14 +347,42 @@ async function profilesCreate() {
 async function profilesView(id) {
   try {
     const r = await api('/api/profiles/' + id);
-    shell(`${pageHeader('View User Profile', 'Reviewing system grants for ' + esc(r.profile.profile_name))} <div style="max-width: 600px; margin: 0 auto; background: #fff; padding: 2rem; border-radius: 8px; border: 1px solid #f0f0f0;"> <p class="meta-text" style="font-size:1.1rem; margin-bottom:1rem;"><strong>ID:</strong> #${r.profile.profile_id}</p> <p class="meta-text" style="font-size:1.1rem; margin-bottom:1rem;"><strong>Designation:</strong> ${esc(r.profile.profile_name)}</p> <p class="meta-text" style="font-size:1.1rem; margin-bottom:1rem;"><strong>Status:</strong> <span class="badge ${(r.profile.status || 'Active') === 'Active' ? 'badge-success' : 'badge-danger'}">${esc(r.profile.status || 'Active')}</span></p> <p class="meta-text" style="font-size:1.1rem; margin-bottom:1rem;"><strong>System Grants:</strong><br><br> ${parsePermissions(r.profile.permissions).map(p => `<span class="badge badge-neutral" style="margin:4px;">${p}</span>`).join('') || 'None Assigned'}</p> <div class="actions" style="margin-top: 2rem; justify-content:center;"> <a href="#/profiles" class="btn btn-outline">Return to Directory</a> </div> </div>`);
-  } catch (ex) { shell(`<p class="error">❌ ${ex.message}</p><a href="#/profiles" class="btn btn-outline">Back</a>`); }
+    
+    const rawPerms = r.profile.permissions || []; 
+    const permissionBadges = parsePermissions(rawPerms).map(p => 
+      `<span class="badge badge-neutral" style="padding: 0.6rem 1rem; font-size: 0.95rem; border-radius: 6px; white-space: nowrap; text-align: left;">${p}</span>`
+    ).join('');
+
+    shell(`
+      ${pageHeader('View User Profile', 'Reviewing system grants for ' + esc(r.profile.profile_name))} 
+      <div style="max-width: 600px; margin: 0 auto; background: #fff; padding: 2rem; border-radius: 8px; border: 1px solid #f0f0f0;"> 
+        <p class="meta-text" style="font-size:1.1rem; margin-bottom:1rem;"><strong>ID:</strong> #${r.profile.profile_id}</p> 
+        <p class="meta-text" style="font-size:1.1rem; margin-bottom:1rem;"><strong>Designation:</strong> ${esc(r.profile.profile_name)}</p> 
+        <p class="meta-text" style="font-size:1.1rem; margin-bottom:1rem;"><strong>Status:</strong> <span class="badge ${(r.profile.status || 'Active') === 'Active' ? 'badge-success' : 'badge-danger'}">${esc(r.profile.status || 'Active')}</span></p> 
+        
+        <div style="margin-bottom: 2rem;">
+          <strong style="font-size: 1.1rem; display: block; margin-bottom: 1rem;">System Grants:</strong>
+          <div style="display: flex; flex-direction: column; gap: 0.5rem; align-items: flex-start;">
+            ${permissionBadges || '<span class="meta-text">None Assigned</span>'}
+          </div>
+        </div>
+
+        <div class="actions" style="margin-top: 2rem; justify-content:center;"> 
+          <a href="#/profiles" class="btn btn-outline">Return to Directory</a> 
+        </div> 
+      </div>
+    `);
+  } catch (ex) { 
+    shell(`<p class="error">❌ ${ex.message}</p><a href="#/profiles" class="btn btn-outline">Back</a>`); 
+  }
 }
 
 async function profilesEdit(id) {
   try {
     const r = await api('/api/profiles/' + id);
     const perms = ['user:manage', 'profile:manage', 'company:manage', 'project:manage', 'interest:view', 'project:view', 'favourite:manage', 'category:manage', 'report:generate'];
+    
+    const userPerms = parsePermissions(r.profile.permissions || []);
     
     const checkboxes = perms.map(p => {
       const isChecked = (r.profile.permissions || []).includes(p) || 
@@ -425,15 +431,14 @@ async function profilesEdit(id) {
 // =============================================================================
 async function companiesList() {
   checkFlash();
-  shell(`${pageHeader('Company Directory', 'Manage your associated business entities before attaching projects.')} <div class="actions" style="justify-content: center; margin-bottom: 2rem;"> <a href="#/companies/create" class="btn btn-elegant">+ Register Company</a> </div> <div class="search-bar"> <input id="q" placeholder="Search business names or locations..." style="flex:1;" /> <button class="btn btn-elegant" id="s">Search</button> <button class="btn btn-outline" id="r">Reset</button> </div> <div id="tb"></div>`);
+  shell(`${pageHeader('Company Directory', 'Manage your associated business entities before attaching projects.')} <div class="actions" style="justify-content: center; margin-bottom: 2rem;"> <a href="#/companies/create" class="btn btn-elegant">+ Create Company</a> </div> <div class="search-bar"> <input id="q" placeholder="Search business names or locations..." style="flex:1;" /> <button class="btn btn-elegant" id="s">Search</button> <button class="btn btn-outline" id="r">Reset</button> </div> <div id="tb"></div>`);
   
   const reload = async q => {
     try {
       const L = (q ? await api('/api/companies/search?q=' + encodeURIComponent(q)) : await api('/api/companies')).companies;
-      const tb = $('#tb'); if (!tb) return; // Race condition fix
-      if (L.length === 0) {
-        tb.innerHTML = '<p class="error">❌ No companies registered yet.</p>';
-      } else {
+      const tb = $('#tb'); if (!tb) return;
+      if (L.length === 0) { tb.innerHTML = '<p class="error">❌ No companies registered yet.</p>'; } 
+      else {
         tb.innerHTML = `<div class="data-grid">` + L.map(c => `
           <div class="data-card" style="padding: 1.5rem;">
             <h3 style="margin-bottom:1rem; font-size: 1.5rem; border-bottom: 1px solid #eee; padding-bottom:1rem;">${esc(c.company_name)}</h3>
@@ -468,11 +473,30 @@ async function companiesList() {
 }
 
 async function companiesCreate() {
-  shell(`${pageHeader('Register Company', 'Enter your corporate details to associate future interior design projects.')} <form id="f" style="max-width: 600px; margin: 0 auto;"> <div class="form-group"><label>Registered Business Name</label><input name="company_name" required/></div> <div class="form-group"><label>HQ Address</label><input name="address"/></div> <div class="form-group"><label>Contact Hotline</label><input name="contact_no"/></div> <p id="m" class="error"></p> <div class="actions" style="justify-content: center; margin-top: 2rem;"> <button type="submit" class="btn btn-elegant">Save Business Profile</button> <a href="#/companies" class="btn btn-outline">Cancel</a> </div> </form>`);
+  shell(`${pageHeader('Create Company Information', 'Enter your corporate details to associate future interior design projects.')} 
+    <form id="f" style="max-width: 600px; margin: 0 auto;"> 
+      <div class="form-group"><label>Registered Business Name</label><input name="company_name" required/></div> 
+      <div class="form-group"><label>HQ Address</label><input name="address"/></div> 
+      <div class="form-group">
+        <label>Contact Hotline (8 Digits)</label>
+        <input name="contact_no" type="tel" pattern="\\d{8}" maxlength="8" placeholder="e.g. 91234567" title="Please enter exactly 8 digits"/>
+      </div> 
+      <p id="m" class="error"></p> 
+      <div class="actions" style="justify-content: center; margin-top: 2rem;"> 
+        <button type="submit" class="btn btn-elegant">Create Company Information</button> 
+        <a href="#/companies" class="btn btn-outline">Cancel</a> 
+      </div> 
+    </form>`);
   
   $('#f').onsubmit = async e => {
     e.preventDefault();
     const b = Object.fromEntries(new FormData(e.target));
+    
+    if (b.contact_no && !/^\d{8}$/.test(b.contact_no)) {
+      showMsg('m', '❌ Contact Hotline must be exactly 8 digits.', true);
+      return;
+    }
+
     showMsg('m', 'Saving...', false);
     try {
       await api('/api/companies', { method: 'POST', body: JSON.stringify(b) });
@@ -492,11 +516,30 @@ async function companiesView(id) {
 async function companiesEdit(id) {
   try {
     const r = await api('/api/companies/' + id);
-    shell(`${pageHeader('Update Company Information', 'Updating details for ' + esc(r.company.company_name))} <form id="f" style="max-width: 600px; margin: 0 auto;"> <div class="form-group"><label>Company name</label><input name="company_name" value="${esc(r.company.company_name)}" required/></div> <div class="form-group"><label>Address</label><input name="address" value="${esc(r.company.address || '')}"/></div> <div class="form-group"><label>Contact</label><input name="contact_no" value="${esc(r.company.contact_no || '')}"/></div> <p id="m" class="error"></p> <div class="actions" style="justify-content: center; margin-top: 2rem;"> <button type="submit" class="btn btn-elegant">Update Company Information</button> <a href="#/companies" class="btn btn-outline">Cancel</a> </div> </form>`);
+    shell(`${pageHeader('Update Company Information', 'Updating details for ' + esc(r.company.company_name))} 
+      <form id="f" style="max-width: 600px; margin: 0 auto;"> 
+        <div class="form-group"><label>Company name</label><input name="company_name" value="${esc(r.company.company_name)}" required/></div> 
+        <div class="form-group"><label>Address</label><input name="address" value="${esc(r.company.address || '')}"/></div> 
+        <div class="form-group">
+          <label>Contact Hotline (8 Digits)</label>
+          <input name="contact_no" type="tel" pattern="\\d{8}" maxlength="8" value="${esc(r.company.contact_no || '')}" placeholder="e.g. 91234567" title="Please enter exactly 8 digits"/>
+        </div> 
+        <p id="m" class="error"></p> 
+        <div class="actions" style="justify-content: center; margin-top: 2rem;"> 
+          <button type="submit" class="btn btn-elegant">Update Company Information</button> 
+          <a href="#/companies" class="btn btn-outline">Cancel</a> 
+        </div> 
+      </form>`);
     
     $('#f').onsubmit = async e => {
       e.preventDefault();
       const b = Object.fromEntries(new FormData(e.target));
+
+      if (b.contact_no && !/^\d{8}$/.test(b.contact_no)) {
+        showMsg('m', '❌ Contact Hotline must be exactly 8 digits.', true);
+        return;
+      }
+
       showMsg('m', 'Saving...', false);
       try {
         await api('/api/companies/' + id, { method: 'PUT', body: JSON.stringify(b) });
@@ -513,7 +556,7 @@ async function companiesEdit(id) {
 async function projectsList() {
   checkFlash();
   let CS = (await api('/api/companies')).companies;
-  if (!CS.length) return shell(pageHeader('Project Workspace', '❌ Please register a company first.') + `<div style="text-align:center;"><a href="#/companies/create" class="btn btn-elegant">Register Company</a></div>`);
+  if (!CS.length) return shell(pageHeader('Project Workspace', '❌ Please create a company first.') + `<div style="text-align:center;"><a href="#/companies/create" class="btn btn-elegant">Create Company</a></div>`);
   
   if (!window._activeCompany || !CS.find(c => c.company_id == window._activeCompany)) {
     window._activeCompany = CS[0].company_id;
@@ -550,10 +593,9 @@ async function projectsList() {
       else if (st) u += '?status=' + st;
       
       L = (await api(u)).projects;
-      const tb = $('#tb'); if (!tb) return; // Race condition fix
-      if (L.length === 0) {
-        tb.innerHTML = '<p class="error">❌ Portfolio is empty for this criteria.</p>';
-      } else {
+      const tb = $('#tb'); if (!tb) return;
+      if (L.length === 0) { tb.innerHTML = '<p class="error">❌ Portfolio is empty for this criteria.</p>'; } 
+      else {
         tb.innerHTML = `<div class="data-grid">` + L.map(p => {
           const i = im[p.project_id] || { views: 0, shortlists: 0 };
           return `
@@ -581,11 +623,7 @@ async function projectsList() {
     } catch (ex) { alert(ex.message); }
   };
   
-  $('#sel').onchange = e => {
-    cur = e.target.value;
-    window._activeCompany = cur;
-    reload();
-  };
+  $('#sel').onchange = e => { cur = e.target.value; window._activeCompany = cur; reload(); };
   $('#q').oninput = debounce(() => reload($('#q').value), 300);
   $('#s').onclick = () => reload($('#q').value);
   $('#r').onclick = () => { $('#q').value = ''; $('#st').value = ''; reload(); };
@@ -607,13 +645,13 @@ async function projectsCreate() {
   let CS = (await api('/api/companies')).companies;
   if (!CS.length) return shell(pageHeader('Create New Project', '❌ Missing company requirement.') + `<a href="#/companies" class="btn btn-outline">Back</a>`);
   
-  shell(`${pageHeader('Create New Project', 'Add a new showcase to your portfolio.')} <form id="f" style="max-width: 600px; margin: 0 auto;"> <div class="form-group"> <label>Governing Company</label> <select name="company_id">${CS.map(c => `<option value="${c.company_id}">${esc(c.company_name)}</option>`).join('')}</select> </div> <div class="form-group"><label>Project Title</label><input name="title" required/></div> <div class="form-group"><label>Design Narrative</label><textarea name="description" rows="4" required></textarea></div> <div class="form-group"> <label>Phase Status</label> <select name="status"><option>Ongoing</option><option>Completed</option></select> </div> <div class="form-group"><label>Hero Image URL</label><input name="image_url" placeholder="https://..."/></div> <p id="m" class="error"></p> <div class="actions" style="justify-content: center; margin-top: 2rem;"> <button type="submit" class="btn btn-elegant">Publish Showcase</button> <a href="#/projects" class="btn btn-outline">Cancel</a> </div> </form>`);
+  shell(`${pageHeader('Create New Project', 'Add a new showcase to your portfolio.')} <form id="f" style="max-width: 600px; margin: 0 auto;"> <div class="form-group"> <label>Governing Company</label> <select name="company_id">${CS.map(c => `<option value="${c.company_id}">${esc(c.company_name)}</option>`).join('')}</select> </div> <div class="form-group"><label>Project Title</label><input name="title" required/></div> <div class="form-group"><label>Design Narrative</label><textarea name="description" rows="4" required></textarea></div> <div class="form-group"> <label>Phase Status</label> <select name="status"><option>Ongoing</option><option>Completed</option></select> </div> <div class="form-group"><label>Hero Image URL</label><input name="image_url" placeholder="https://..."/></div> <p id="m" class="error"></p> <div class="actions" style="justify-content: center; margin-top: 2rem;"> <button type="submit" class="btn btn-elegant">Create New Project</button> <a href="#/projects" class="btn btn-outline">Cancel</a> </div> </form>`);
   
   $('#f').onsubmit = async e => {
     e.preventDefault();
     const b = Object.fromEntries(new FormData(e.target));
     b.company_id = +b.company_id;
-    showMsg('m', 'Publishing...', false);
+    showMsg('m', 'Saving...', false);
     try {
       await api('/api/projects', { method: 'POST', body: JSON.stringify(b) });
       flash('Project created successfully!');
@@ -664,10 +702,9 @@ async function browseList() {
   const reload = async q => {
     try {
       const r = await api('/api/projects/public/search' + (q ? '?q=' + encodeURIComponent(q) : ''));
-      const tb = $('#tb'); if (!tb) return; // Race condition fix
-      if (r.projects.length === 0) {
-        tb.innerHTML = '<p class="error">❌ No projects discovered matching criteria.</p>';
-      } else {
+      const tb = $('#tb'); if (!tb) return;
+      if (r.projects.length === 0) { tb.innerHTML = '<p class="error">❌ No projects discovered matching criteria.</p>'; } 
+      else {
         tb.innerHTML = `<div class="data-grid">` + r.projects.map(p => `
           <div class="data-card">
             <img src="${p.image_url || 'https://via.placeholder.com/600x400?text=Premium+Design'}" alt="${esc(p.title)}">
@@ -729,10 +766,9 @@ async function favouritesList() {
   const reload = async q => {
     try {
       const r = q ? await api('/api/favourites/search?q=' + encodeURIComponent(q)) : await api('/api/favourites');
-      const tb = $('#tb'); if (!tb) return; // Race condition fix
-      if (r.favourites.length === 0) {
-        tb.innerHTML = '<p class="error">❌ Your inspiration board is currently empty.</p>';
-      } else {
+      const tb = $('#tb'); if (!tb) return;
+      if (r.favourites.length === 0) { tb.innerHTML = '<p class="error">❌ Your inspiration board is currently empty.</p>'; } 
+      else {
         tb.innerHTML = `<div class="data-grid">` + r.favourites.map(f => `
           <div class="data-card">
             <img src="${f.image_url || 'https://via.placeholder.com/600x400?text=Inspiration'}" alt="${esc(f.title)}">
@@ -779,10 +815,9 @@ async function categoriesList() {
   const reload = async q => {
     try {
       const L = (q ? (await api('/api/categories/search?q=' + encodeURIComponent(q))) : (await api('/api/categories'))).categories;
-      const tb = $('#tb'); if (!tb) return; // Race condition fix
-      if (L.length === 0) {
-        tb.innerHTML = '<p class="error">❌ No classification categories found.</p>';
-      } else {
+      const tb = $('#tb'); if (!tb) return;
+      if (L.length === 0) { tb.innerHTML = '<p class="error">❌ No classification categories found.</p>'; } 
+      else {
         tb.innerHTML = `<div class="data-grid">` + L.map(c => `
           <div class="data-card" style="padding: 1.5rem;">
             <div class="data-header">
@@ -818,7 +853,7 @@ async function categoriesList() {
 }
 
 async function categoriesCreate() {
-  shell(`${pageHeader('Create IDP Category', 'Standardize a new structural category for portfolios.')} <form id="f" style="max-width: 600px; margin: 0 auto;"> <div class="form-group"><label>Classification Title</label><input name="category_name" required/></div> <div class="form-group"><label>Architectural Description</label><textarea name="description" rows="4"></textarea></div> <p id="m" class="error"></p> <div class="actions" style="justify-content: center; margin-top: 2rem;"> <button type="submit" class="btn btn-elegant">Save Classification</button> <a href="#/categories" class="btn btn-outline">Cancel</a> </div> </form>`);
+  shell(`${pageHeader('Create IDP Category', 'Standardize a new structural category for portfolios.')} <form id="f" style="max-width: 600px; margin: 0 auto;"> <div class="form-group"><label>Classification Title</label><input name="category_name" required/></div> <div class="form-group"><label>Architectural Description</label><textarea name="description" rows="4"></textarea></div> <p id="m" class="error"></p> <div class="actions" style="justify-content: center; margin-top: 2rem;"> <button type="submit" class="btn btn-elegant">Create IDP Category</button> <a href="#/categories" class="btn btn-outline">Cancel</a> </div> </form>`);
   
   $('#f').onsubmit = async e => {
     e.preventDefault();

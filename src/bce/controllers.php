@@ -211,7 +211,24 @@ class CreateCompanyController {
         try {
             $b = req_body();
             if (empty($b['company_name'])) { json_out(400, ['error' => 'Company Name is a mandatory field.']); return; }
-            json_out(201, ['company' => CompanyInfo::saveCompany(['owner_id' => session_user()['account_id'], 'company_name' => $b['company_name'], 'address' => $b['address'] ?? null, 'contact_no' => $b['contact_no'] ?? null])]);
+            
+            // Validate Contact Number (Must be exactly 8 digits if provided)
+            $contactNo = $b['contact_no'] ?? '';
+            if (!empty($contactNo)) {
+                $digitsOnly = preg_replace('/\D/', '', $contactNo); // Strip out +65, spaces, etc.
+                if (strlen($digitsOnly) !== 8) {
+                    json_out(400, ['error' => 'Contact Hotline must be exactly 8 digits (e.g., 91234567).']);
+                    return;
+                }
+                $b['contact_no'] = $digitsOnly; // Standardize to just 8 digits
+            }
+
+            json_out(201, ['company' => CompanyInfo::saveCompany([
+                'owner_id' => session_user()['account_id'], 
+                'company_name' => $b['company_name'], 
+                'address' => $b['address'] ?? null, 
+                'contact_no' => $b['contact_no'] ?? null
+            ])]);
         } catch (Throwable $e) { handle_error($e, 'Failed to create company profile.'); }
     }
 }
@@ -230,8 +247,21 @@ class UpdateCompanyController {
             $c = CompanyInfo::findById($params['id']);
             if (!$c) { json_out(404, ['error' => 'Company record not found.']); return; }
             if ((int)$c['owner_id'] !== (int)session_user()['account_id']) { json_out(403, ['error' => 'You do not have permission to edit this company.']); return; }
+            
             $b = req_body();
             if (empty($b['company_name'])) { json_out(400, ['error' => 'Company Name cannot be left blank.']); return; }
+
+            // Validate Contact Number
+            $contactNo = $b['contact_no'] ?? '';
+            if (!empty($contactNo)) {
+                $digitsOnly = preg_replace('/\D/', '', $contactNo);
+                if (strlen($digitsOnly) !== 8) {
+                    json_out(400, ['error' => 'Contact Hotline must be exactly 8 digits (e.g., 91234567).']);
+                    return;
+                }
+                $b['contact_no'] = $digitsOnly;
+            }
+
             json_out(200, ['company' => CompanyInfo::updateCompanyInfo($params['id'], $b)]);
         } catch (Throwable $e) { handle_error($e); }
     }
