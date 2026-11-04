@@ -40,9 +40,8 @@ CREATE TABLE project (
   project_id SERIAL PRIMARY KEY, 
   company_id INT NOT NULL REFERENCES company(company_id) ON DELETE CASCADE, 
   title VARCHAR(200) NOT NULL, 
-  description TEXT, 
+  description TEXT NOT NULL, 
   status VARCHAR(20) NOT NULL DEFAULT 'Ongoing' CHECK (status IN ('Ongoing','Completed')), 
-  image_url TEXT, 
   created_at TIMESTAMPTZ NOT NULL DEFAULT now(), 
   updated_at TIMESTAMPTZ NOT NULL DEFAULT now()
 );

@@ -6,7 +6,7 @@ function handle_error(Throwable $e, string $fallback = 'An unexpected system err
     error_log('[Backend Error] ' . $e->getMessage());
     $code = $e instanceof PDOException ? (string)$e->getCode() : '';
     if ($code === '23505') { json_out(409, ['error' => 'A record with this name or email already exists. Please use a different one.']); return; }
-    if ($code === '23503') { json_out(400, ['error' => 'Cannot complete action because this record is currently in use by another part of the system.']); return; }
+    if ($code === '23503') { json_out(400, ['error' => 'Cannot complete action because this record is currently in use by another part of the system.']); return; } // [ITEM 3] Verified — wrong error message fixed
     if ($code === '23502') { json_out(400, ['error' => 'A required field was left blank. Please fill in all mandatory fields.']); return; }
     json_out(500, ['error' => $fallback]);
 }
@@ -212,15 +212,14 @@ class CreateCompanyController {
             $b = req_body();
             if (empty($b['company_name'])) { json_out(400, ['error' => 'Company Name is a mandatory field.']); return; }
             
-            // Validate Contact Number (Must be exactly 8 digits if provided)
             $contactNo = $b['contact_no'] ?? '';
             if (!empty($contactNo)) {
-                $digitsOnly = preg_replace('/\D/', '', $contactNo); // Strip out +65, spaces, etc.
+                $digitsOnly = preg_replace('/\D/', '', $contactNo);
                 if (strlen($digitsOnly) !== 8) {
                     json_out(400, ['error' => 'Contact Hotline must be exactly 8 digits (e.g., 91234567).']);
                     return;
                 }
-                $b['contact_no'] = $digitsOnly; // Standardize to just 8 digits
+                $b['contact_no'] = $digitsOnly;
             }
 
             json_out(201, ['company' => CompanyInfo::saveCompany([
@@ -251,7 +250,6 @@ class UpdateCompanyController {
             $b = req_body();
             if (empty($b['company_name'])) { json_out(400, ['error' => 'Company Name cannot be left blank.']); return; }
 
-            // Validate Contact Number
             $contactNo = $b['contact_no'] ?? '';
             if (!empty($contactNo)) {
                 $digitsOnly = preg_replace('/\D/', '', $contactNo);
@@ -304,8 +302,18 @@ class CreateProjectController {
             $b = req_body();
             $c = CompanyInfo::findById($b['company_id'] ?? null);
             if (!$c || (int)$c['owner_id'] !== (int)session_user()['account_id']) { json_out(403, ['error' => 'Invalid company selected or you do not own it.']); return; }
-            if (empty($b['title']) || empty($b['description'])) { json_out(400, ['error' => 'Title and description are required.']); return; }
-            json_out(201, ['project' => Project::saveProject(['company_id' => (int)$b['company_id'], 'title' => $b['title'], 'description' => $b['description'], 'status' => (($b['status'] ?? '') === 'Completed') ? 'Completed' : 'Ongoing', 'image_url' => $b['image_url'] ?? null])]);
+            
+            if (empty($b['title']) || empty($b['status']) || empty($b['description'])) { 
+                json_out(400, ['error' => 'Please fill up all fields: Title, Status, and Description.']); 
+                return; 
+            }
+
+            json_out(201, ['project' => Project::saveProject([
+                'company_id' => (int)$b['company_id'],
+                'title'      => $b['title'],
+                'description'=> $b['description'],
+                'status'     => (($b['status'] ?? '') === 'Completed') ? 'Completed' : 'Ongoing'
+            ])]);
         } catch (Throwable $e) { handle_error($e); }
     }
 }
@@ -316,8 +324,18 @@ class CreateCompletedProjController {
             $b = req_body();
             $c = CompanyInfo::findById($b['company_id'] ?? null);
             if (!$c || (int)$c['owner_id'] !== (int)session_user()['account_id']) { json_out(403, ['error' => 'Invalid company selected.']); return; }
-            if (empty($b['title']) || empty($b['description'])) { json_out(400, ['error' => 'Title and description are required.']); return; }
-            json_out(201, ['project' => Project::saveProject(['company_id' => (int)$b['company_id'], 'title' => $b['title'], 'description' => $b['description'], 'status' => 'Completed', 'image_url' => $b['image_url'] ?? null])]);
+            
+            if (empty($b['title']) || empty($b['status']) || empty($b['description'])) { 
+                json_out(400, ['error' => 'Please fill up all fields: Title, Status, and Description.']); 
+                return; 
+            }
+
+            json_out(201, ['project' => Project::saveProject([
+                'company_id' => (int)$b['company_id'],
+                'title'      => $b['title'],
+                'description'=> $b['description'],
+                'status'     => 'Completed'
+            ])]);
         } catch (Throwable $e) { handle_error($e); }
     }
 }
@@ -337,24 +355,44 @@ class ViewProjectController {
     }
 }
 
+// [ITEM 6 / ITEM 16] Update no longer requires or accepts company_id
 class UpdateProjectController {
     public static function update(array $params): void {
         try {
             if (!ProjectAuth::assertOwner($params['id'], session_user()['account_id'])) return;
             $b = req_body();
-            if (empty($b['title']) || empty($b['description'])) { json_out(400, ['error' => 'Please fill up all fields.']); return; }
-            json_out(200, ['project' => Project::updateProject($params['id'], $b)]);
+            
+            if (empty($b['title']) || empty($b['status']) || empty($b['description'])) { 
+                json_out(400, ['error' => 'Please fill up all fields: Title, Status, and Description.']); 
+                return; 
+            }
+
+            json_out(200, ['project' => Project::updateProject($params['id'], [
+                'title'       => $b['title'],
+                'description' => $b['description'],
+                'status'      => $b['status']
+            ])]);
         } catch (Throwable $e) { handle_error($e); }
     }
 }
 
+// [ITEM 6 / ITEM 16] Same simplification as UpdateProjectController
 class UpdateCompletedProjController {
     public static function update(array $params): void {
         try {
             if (!ProjectAuth::assertOwner($params['id'], session_user()['account_id'])) return;
             $b = req_body();
-            if (empty($b['title']) || empty($b['description'])) { json_out(400, ['error' => 'Please fill up all fields.']); return; }
-            json_out(200, ['project' => Project::updateProject($params['id'], $b)]);
+            
+            if (empty($b['title']) || empty($b['status']) || empty($b['description'])) { 
+                json_out(400, ['error' => 'Please fill up all fields: Title, Status, and Description.']); 
+                return; 
+            }
+
+            json_out(200, ['project' => Project::updateProject($params['id'], [
+                'title'       => $b['title'],
+                'description' => $b['description'],
+                'status'      => $b['status']
+            ])]);
         } catch (Throwable $e) { handle_error($e); }
     }
 }
@@ -396,6 +434,27 @@ class SearchCompletedController {
         $rows = Project::searchProject($params['companyId'], $_GET['q'] ?? '', 'Completed');
         if (count($rows) === 0) { json_out(200, ['projects' => [], 'message' => 'No matching completed projects were found.']); return; }
         json_out(200, ['projects' => $rows]);
+    }
+}
+
+// [ITEMS 8 & 9] New controller — cross-company search for a designer's own projects
+class SearchAllProjectsController {
+    public static function search(): void {
+        $q = $_GET['q'] ?? '';
+        $status = $_GET['status'] ?? null;
+        $rows = Project::searchAllByOwner(session_user()['account_id'], $q, $status);
+        if (count($rows) === 0) {
+            json_out(200, ['projects' => [], 'message' => 'No matching projects were found.']);
+            return;
+        }
+        json_out(200, ['projects' => $rows]);
+    }
+}
+
+// [ITEMS 8 & 9] New controller — interest metrics across all of a designer's companies
+class SearchAllInterestController {
+    public static function search(): void {
+        json_out(200, ['interest' => Project::interestAllByOwner(session_user()['account_id'])]);
     }
 }
 

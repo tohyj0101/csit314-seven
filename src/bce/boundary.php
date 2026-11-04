@@ -48,6 +48,11 @@ $r->get   ('/projects/company/:companyId',         [$auth, $D],  fn($p) => ViewP
 $r->get   ('/projects/company/:companyId/search',  [$auth, $D],  fn($p) => SearchProjectController::search($p));
 $r->get   ('/projects/company/:companyId/completed/search', [$auth, $D], fn($p) => SearchCompletedController::search($p));
 $r->get   ('/projects/company/:companyId/interest',[$auth, $D],  fn($p) => ProjectInterestController::interest($p));
+
+// [ITEMS 8 & 9] Global (cross-company) search for designer's own projects
+$r->get   ('/projects/search',                     [$auth, $D],  fn() => SearchAllProjectsController::search());
+$r->get   ('/projects/search/interest',            [$auth, $D],  fn() => SearchAllInterestController::search());
+
 $r->post  ('/projects/completed',                  [$auth, $D],  fn() => CreateCompletedProjController::create());
 $r->get   ('/projects/:id',                        [$auth, $D],  fn($p) => ViewProjectController::view($p));
 $r->put   ('/projects/:id',                        [$auth, $D],  fn($p) => UpdateProjectController::update($p));

@@ -36,7 +36,7 @@ for ($i = 1; $i <= 100; $i++) {
 }
 echo "✅ 100 Categories generated.\n";
 
-// 3. Generate 100 Companies (Updated to 8-digit phone numbers)
+// 3. Generate 100 Companies (8-digit phone numbers)
 for ($i = 1; $i <= 100; $i++) {
     $name = "Synthetic Company " . $i;
     if (!q1("SELECT company_id FROM company WHERE company_name = $1", [$name])) {
@@ -57,7 +57,7 @@ echo "✅ 100 Companies generated.\n";
 $companies = q("SELECT company_id FROM company");
 $categories = q("SELECT category_id FROM category");
 
-// 4. Generate 100 Projects
+// 4. Generate 100 Projects (Updated for Date, removed image_url)
 for ($i = 1; $i <= 100; $i++) {
     $title = "Synthetic Project " . $i;
     if (!q1("SELECT project_id FROM project WHERE title = $1", [$title])) {
@@ -65,8 +65,15 @@ for ($i = 1; $i <= 100; $i++) {
         $cat = $categories[array_rand($categories)]['category_id'];
         $status = ($i % 2 == 0) ? 'Completed' : 'Ongoing';
         
+        // Generate a random date within the last 365 days
+        $randomDate = date('Y-m-d', strtotime('-' . rand(1, 365) . ' days'));
+        
         $proj = Project::saveProject([
-            'company_id' => $comp, 'title' => $title, 'description' => "Auto-generated project $i", 'status' => $status, 'image_url' => '/img/sample.jpg'
+            'company_id' => $comp, 
+            'title' => $title, 
+            'date' => $randomDate,
+            'description' => "Auto-generated project $i", 
+            'status' => $status
         ]);
         
         // Link to category

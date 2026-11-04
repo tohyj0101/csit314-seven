@@ -193,7 +193,7 @@ async function dashboard() {
   }
   if (perms.includes('category:manage') || perms.includes('report:generate')) {
     cards += `<div class="data-card" style="padding: 2.5rem 2rem; text-align: center;"> <h3 style="margin-bottom: 1rem; font-size: 1.5rem;">Executive Reports</h3> <p class="meta-text" style="margin-bottom: 2rem;">Generate traffic, engagement, and user acquisition analytics.</p> <a href="#/reports" class="btn btn-elegant" style="width: 100%;">View Analytics</a> </div>`;
-    cards += `<div class="data-card" style="padding: 2.5rem 2rem; text-align: center;"> <h3 style="margin-bottom: 1rem; font-size: 1.5rem;">Taxonomy</h3> <p class="meta-text" style="margin-bottom: 2rem;">Maintain the standard classification tags used across the platform.</p> <a href="#/categories" class="btn btn-elegant" style="width: 100%;">Manage Categories</a> </div>`;
+    cards += `<div class="data-card" style="padding: 2.5rem 2rem; text-align: center;"> <h3 style="margin-bottom: 1rem; font-size: 1.5rem;">Categories</h3> <p class="meta-text" style="margin-bottom: 2rem;">Maintain the standard classification tags used across the platform.</p> <a href="#/categories" class="btn btn-elegant" style="width: 100%;">Manage Categories</a> </div>`;
   }
   
   if (!cards) {
@@ -382,8 +382,6 @@ async function profilesEdit(id) {
     const r = await api('/api/profiles/' + id);
     const perms = ['user:manage', 'profile:manage', 'company:manage', 'project:manage', 'interest:view', 'project:view', 'favourite:manage', 'category:manage', 'report:generate'];
     
-    const userPerms = parsePermissions(r.profile.permissions || []);
-    
     const checkboxes = perms.map(p => {
       const isChecked = (r.profile.permissions || []).includes(p) || 
                         (Array.isArray(r.profile.permissions) && r.profile.permissions.includes(p)) ||
@@ -461,7 +459,7 @@ async function companiesList() {
   
   $('#tb').onclick = async e => {
     const di = e.target.getAttribute('data-d');
-    if (di && confirm('Permanently remove Company #' + di + '? All attached projects will fail if restricted.')) {
+    if (di && confirm('Delete Company #' + di + ' permanently?')) {
       try {
         await api('/api/companies/' + di, { method: 'DELETE' });
         showToast('Company Information deleted successfully!');
@@ -552,6 +550,8 @@ async function companiesEdit(id) {
 
 // =============================================================================
 // 6. PROJECTS (Designer Only)
+//    [ITEMS 4, 5, 6, 8, 9, 16] – no company selector, cross-company search,
+//    update form reordered Title → Description → Status
 // =============================================================================
 async function projectsList() {
   checkFlash();
@@ -562,13 +562,12 @@ async function projectsList() {
     window._activeCompany = CS[0].company_id;
   }
   
-  let cur = window._activeCompany, L = [], im = {};
+  let L = [], im = {};
   shell(`
     ${pageHeader('Project Workspace & Analytics', 'Track your portfolio and monitor audience engagement metrics (Views/Saves).')}
-    <div style="max-width:800px; margin:0 auto; background: #fff; padding: 1.5rem; border-radius:8px; border:1px solid #eee; margin-bottom: 2rem; display:flex; gap: 1rem; align-items:flex-end;">
+    <div style="max-width:800px; margin:0 auto; background: #fff; padding: 1.5rem; border-radius:8px; border:1px solid #eee; margin-bottom: 2rem; display:flex; gap: 1rem; align-items:center; justify-content: space-between;">
       <div style="flex:1;">
-        <label style="font-size:0.8rem;">Operating Entity</label>
-        <select id="sel">${CS.map(c => `<option value="${c.company_id}" ${c.company_id == cur ? 'selected' : ''}>${esc(c.company_name)}</option>`).join('')}</select>
+        <span class="meta-text"><strong>${CS.length}</strong> ${CS.length === 1 ? 'company' : 'companies'} &middot; <strong id="projCount">0</strong> projects shown</span>
       </div>
       <a href="#/projects/create" class="btn btn-elegant">+ Create New Project</a>
     </div>
@@ -584,28 +583,33 @@ async function projectsList() {
   const reload = async q => {
     try {
       im = {};
-      const interestReq = await api('/api/projects/company/' + cur + '/interest');
-      (interestReq.interest || []).forEach(i => im[i.project_id] = i);
-      
       const st = $('#st').value;
-      let u = '/api/projects/company/' + cur;
-      if (q) u += '/search?q=' + encodeURIComponent(q) + (st ? '&status=' + st : '');
-      else if (st) u += '?status=' + st;
       
+      // [ITEMS 8 & 9] Always use cross-company search for designer's projects
+      const u = '/api/projects/search?q=' + encodeURIComponent(q) + (st ? '&status=' + encodeURIComponent(st) : '');
       L = (await api(u)).projects;
+      
+      // Fetch interest metrics for all of the designer's projects at once
+      try {
+        const ri = await api('/api/projects/search/interest');
+        (ri.interest || []).forEach(i => im[i.project_id] = i);
+      } catch (_) {}
+      
       const tb = $('#tb'); if (!tb) return;
-      if (L.length === 0) { tb.innerHTML = '<p class="error">❌ Portfolio is empty for this criteria.</p>'; } 
+      const cnt = $('#projCount'); if (cnt) cnt.textContent = L.length;
+      
+      if (L.length === 0) { tb.innerHTML = '<p class="error">❌ No projects found for this criteria.</p>'; } 
       else {
         tb.innerHTML = `<div class="data-grid">` + L.map(p => {
           const i = im[p.project_id] || { views: 0, shortlists: 0 };
           return `
             <div class="data-card">
-              <img src="${p.image_url || 'https://via.placeholder.com/600x400?text=No+Cover+Image'}" alt="${esc(p.title)}">
               <div class="data-info">
                 <div class="data-header">
                   <h3>${esc(p.title)}</h3>
                   <span class="badge ${p.status === 'Completed' ? 'badge-neutral' : 'badge-success'}">${esc(p.status)}</span>
                 </div>
+                ${p.company_name ? `<p class="meta-text" style="color:var(--primary); font-size:0.75rem; text-transform:uppercase; letter-spacing:1px; margin: 0.25rem 0 0.75rem;">${esc(p.company_name)}</p>` : ''}
                 <div class="metrics-row">
                   <div class="metric-item">👁️ ${i.views} Views</div>
                   <div class="metric-item">⭐ ${i.shortlists} Saves</div>
@@ -623,14 +627,13 @@ async function projectsList() {
     } catch (ex) { alert(ex.message); }
   };
   
-  $('#sel').onchange = e => { cur = e.target.value; window._activeCompany = cur; reload(); };
   $('#q').oninput = debounce(() => reload($('#q').value), 300);
   $('#s').onclick = () => reload($('#q').value);
-  $('#r').onclick = () => { $('#q').value = ''; $('#st').value = ''; reload(); };
+  $('#r').onclick = () => { $('#q').value = ''; $('#st').value = ''; reload(''); };
   
   $('#tb').onclick = async e => {
     const di = e.target.getAttribute('data-d');
-    if (di && confirm('Permanently remove Project #' + di + '?')) {
+    if (di && confirm('Delete Project #' + di + ' permanently?')) {
       try {
         await api('/api/projects/' + di, { method: 'DELETE' });
         showToast('Project deleted successfully!');
@@ -638,14 +641,47 @@ async function projectsList() {
       } catch (ex) { alert(ex.message); }
     }
   };
-  await reload();
+  await reload('');
 }
 
 async function projectsCreate() {
   let CS = (await api('/api/companies')).companies;
   if (!CS.length) return shell(pageHeader('Create New Project', '❌ Missing company requirement.') + `<a href="#/companies" class="btn btn-outline">Back</a>`);
   
-  shell(`${pageHeader('Create New Project', 'Add a new showcase to your portfolio.')} <form id="f" style="max-width: 600px; margin: 0 auto;"> <div class="form-group"> <label>Governing Company</label> <select name="company_id">${CS.map(c => `<option value="${c.company_id}">${esc(c.company_name)}</option>`).join('')}</select> </div> <div class="form-group"><label>Project Title</label><input name="title" required/></div> <div class="form-group"><label>Design Narrative</label><textarea name="description" rows="4" required></textarea></div> <div class="form-group"> <label>Phase Status</label> <select name="status"><option>Ongoing</option><option>Completed</option></select> </div> <div class="form-group"><label>Hero Image URL</label><input name="image_url" placeholder="https://..."/></div> <p id="m" class="error"></p> <div class="actions" style="justify-content: center; margin-top: 2rem;"> <button type="submit" class="btn btn-elegant">Create New Project</button> <a href="#/projects" class="btn btn-outline">Cancel</a> </div> </form>`);
+  let activeId = window._activeCompany || CS[0].company_id;
+  
+  shell(`${pageHeader('Create New Project', 'Add a new showcase to your portfolio.')} 
+    <form id="f" style="max-width: 600px; margin: 0 auto;"> 
+      
+      <!-- COMPANY SELECTOR (Replaces the hidden input) -->
+      <div class="form-group"> 
+        <label>Company</label> 
+        <select name="company_id">
+          ${CS.map(c => `<option value="${c.company_id}" ${c.company_id == activeId ? 'selected' : ''}>${esc(c.company_name)}</option>`).join('')}
+        </select> 
+      </div> 
+
+      <!-- 1. PROJECT TITLE -->
+      <div class="form-group"><label>Project Title</label><input name="title" required/></div> 
+      
+      <!-- 2. DESCRIPTION -->
+      <div class="form-group"><label>Description</label><textarea name="description" rows="4" required></textarea></div> 
+      
+      <!-- 3. PHASE STATUS -->
+      <div class="form-group"> 
+        <label>Phase Status</label> 
+        <select name="status">
+          <option value="Ongoing">Ongoing</option>
+          <option value="Completed">Completed</option>
+        </select> 
+      </div> 
+      
+      <p id="m" class="error"></p> 
+      <div class="actions" style="justify-content: center; margin-top: 2rem;"> 
+        <button type="submit" class="btn btn-elegant">Create New Project</button> 
+        <a href="#/projects" class="btn btn-outline">Cancel</a> 
+      </div> 
+    </form>`);
   
   $('#f').onsubmit = async e => {
     e.preventDefault();
@@ -663,14 +699,31 @@ async function projectsCreate() {
 async function projectsView(id) {
   try {
     const r = await api('/api/projects/' + id);
-    shell(`${pageHeader('View Interior Design Project', esc(r.project.title))} <div style="max-width: 800px; margin: 0 auto; background: #fff; border-radius: 8px; border: 1px solid #f0f0f0; overflow:hidden;"> <img src="${r.project.image_url || 'https://via.placeholder.com/800x400?text=No+Cover+Image'}" style="width:100%; height:300px; object-fit:cover; border-bottom:1px solid #eee;"> <div style="padding: 2rem;"> <p class="meta-text" style="font-size:1.1rem; margin-bottom:1rem;"><span class="badge ${r.project.status === 'Completed' ? 'badge-neutral' : 'badge-success'}">${esc(r.project.status)}</span></p> <p class="meta-text" style="font-size:1.1rem; margin-bottom:1rem; white-space:pre-line;">${esc(r.project.description || 'No narrative provided.')}</p> <div class="actions" style="margin-top: 2rem; justify-content:center;"> <a href="#/projects" class="btn btn-outline">Return to Portfolio</a> </div> </div> </div>`);
+    shell(`${pageHeader('View Interior Design Project', esc(r.project.title))} <div style="max-width: 800px; margin: 0 auto; background: #fff; border-radius: 8px; border: 1px solid #f0f0f0; overflow:hidden;"> <div style="padding: 2rem;"> <p class="meta-text" style="font-size:1.1rem; margin-bottom:1rem;"><span class="badge ${r.project.status === 'Completed' ? 'badge-neutral' : 'badge-success'}">${esc(r.project.status)}</span></p> <p class="meta-text" style="font-size:1.1rem; margin-bottom:1rem; white-space:pre-line;">${esc(r.project.description || 'No description provided.')}</p> <div class="actions" style="margin-top: 2rem; justify-content:center;"> <a href="#/projects" class="btn btn-outline">Return to Portfolio</a> </div> </div> </div>`);
   } catch (ex) { shell(`<p class="error">❌ ${ex.message}</p>`); }
 }
 
+// [ITEM 6 / ITEM 16] Update form: no Company, order is Title → Description → Status
 async function projectsEdit(id) {
   try {
     const r = await api('/api/projects/' + id);
-    shell(`${pageHeader('Update Project Details', 'Updating parameters for ' + esc(r.project.title))} <form id="f" style="max-width: 600px; margin: 0 auto;"> <div class="form-group"><label>Project Title</label><input name="title" value="${esc(r.project.title)}" required/></div> <div class="form-group"><label>Design Narrative</label><textarea name="description" rows="4" required>${esc(r.project.description || '')}</textarea></div> <div class="form-group"> <label>Phase Status</label> <select name="status"> <option value="Ongoing" ${r.project.status === 'Ongoing' ? 'selected' : ''}>Ongoing</option> <option value="Completed" ${r.project.status === 'Completed' ? 'selected' : ''}>Completed</option> </select> </div> <div class="form-group"><label>Hero Image URL</label><input name="image_url" value="${esc(r.project.image_url || '')}"/></div> <p id="m" class="error"></p> <div class="actions" style="justify-content: center; margin-top: 2rem;"> <button type="submit" class="btn btn-elegant">Update Project Details</button> <a href="#/projects" class="btn btn-outline">Cancel</a> </div> </form>`);
+    shell(`${pageHeader('Update Project Details', 'Updating parameters for ' + esc(r.project.title))} 
+      <form id="f" style="max-width: 600px; margin: 0 auto;"> 
+        <div class="form-group"><label>Project Title</label><input name="title" value="${esc(r.project.title)}" required/></div> 
+        <div class="form-group"><label>Description</label><textarea name="description" rows="4" required>${esc(r.project.description || '')}</textarea></div> 
+        <div class="form-group"> 
+          <label>Phase Status</label> 
+          <select name="status"> 
+            <option value="Ongoing" ${r.project.status === 'Ongoing' ? 'selected' : ''}>Ongoing</option> 
+            <option value="Completed" ${r.project.status === 'Completed' ? 'selected' : ''}>Completed</option> 
+          </select> 
+        </div> 
+        <p id="m" class="error"></p> 
+        <div class="actions" style="justify-content: center; margin-top: 2rem;"> 
+          <button type="submit" class="btn btn-elegant">Update Project Details</button> 
+          <a href="#/projects" class="btn btn-outline">Cancel</a> 
+        </div> 
+      </form>`);
     
     $('#f').onsubmit = async e => {
       e.preventDefault();
@@ -706,18 +759,15 @@ async function browseList() {
       if (r.projects.length === 0) { tb.innerHTML = '<p class="error">❌ No projects discovered matching criteria.</p>'; } 
       else {
         tb.innerHTML = `<div class="data-grid">` + r.projects.map(p => `
-          <div class="data-card">
-            <img src="${p.image_url || 'https://via.placeholder.com/600x400?text=Premium+Design'}" alt="${esc(p.title)}">
-            <div class="data-info">
-              <div class="data-header">
-                <h3>${esc(p.title)}</h3>
-                <span class="badge ${p.status === 'Completed' ? 'badge-neutral' : 'badge-success'}">${esc(p.status)}</span>
-              </div>
-              <p class="meta-text" style="color:var(--primary); font-weight:500; font-size:0.8rem; text-transform:uppercase; letter-spacing:1px; margin-bottom:1rem;">By ${esc(p.company_name)}</p>
-              <div class="actions" style="margin-top:auto; padding-top:1rem; border-top:1px solid #f0f0f0;">
-                <a href="#/browse/view/${p.project_id}" class="btn btn-elegant" style="flex: 1;">Explore Room</a>
-                <button class="btn btn-outline" data-s2="${p.project_id}" title="Save to Favourites" style="padding: 0.6rem;">⭐</button>
-              </div>
+          <div class="data-card" style="padding: 1.5rem;">
+            <div class="data-header">
+              <h3>${esc(p.title)}</h3>
+              <span class="badge ${p.status === 'Completed' ? 'badge-neutral' : 'badge-success'}">${esc(p.status)}</span>
+            </div>
+            <p class="meta-text" style="color:var(--primary); font-weight:500; font-size:0.8rem; text-transform:uppercase; letter-spacing:1px; margin-bottom:1rem;">By ${esc(p.company_name)}</p>
+            <div class="actions" style="margin-top:auto; padding-top:1rem; border-top:1px solid #f0f0f0;">
+              <a href="#/browse/view/${p.project_id}" class="btn btn-elegant" style="flex: 1;">Explore Room</a>
+              <button class="btn btn-outline" data-s2="${p.project_id}" title="Save to Favourites" style="padding: 0.6rem;">⭐</button>
             </div>
           </div>
         `).join('') + `</div>`;
@@ -744,7 +794,7 @@ async function browseList() {
 async function browseView(id) {
   try {
     const r = await api('/api/projects/public/' + id);
-    shell(`${pageHeader('Explore Room', esc(r.project.title))} <div style="max-width: 900px; margin: 0 auto; background: #fff; border-radius: 8px; border: 1px solid #f0f0f0; overflow:hidden;"> <img src="${r.project.image_url || 'https://via.placeholder.com/900x500?text=Room+Preview'}" style="width:100%; height:400px; object-fit:cover; border-bottom:1px solid #eee;"> <div style="padding: 3rem;"> <p class="meta-text" style="font-size:1.2rem; margin-bottom:2rem; line-height:1.8; color:#444;">${esc(r.project.description || 'No conceptual narrative provided by designer.')}</p> <div class="actions" style="justify-content:center;"> <a href="#/browse" class="btn btn-outline">Back to Gallery</a> </div> </div> </div>`);
+    shell(`${pageHeader('Explore Room', esc(r.project.title))} <div style="max-width: 900px; margin: 0 auto; background: #fff; border-radius: 8px; border: 1px solid #f0f0f0; overflow:hidden;"> <div style="padding: 3rem;"> <p class="meta-text" style="font-size:1.2rem; margin-bottom:2rem; line-height:1.8; color:#444;">${esc(r.project.description || 'No conceptual narrative provided by designer.')}</p> <div class="actions" style="justify-content:center;"> <a href="#/browse" class="btn btn-outline">Back to Gallery</a> </div> </div> </div>`);
   } catch (ex) { shell(`<p class="error">❌ ${ex.message}</p>`); }
 }
 
@@ -770,17 +820,14 @@ async function favouritesList() {
       if (r.favourites.length === 0) { tb.innerHTML = '<p class="error">❌ Your inspiration board is currently empty.</p>'; } 
       else {
         tb.innerHTML = `<div class="data-grid">` + r.favourites.map(f => `
-          <div class="data-card">
-            <img src="${f.image_url || 'https://via.placeholder.com/600x400?text=Inspiration'}" alt="${esc(f.title)}">
-            <div class="data-info">
-              <div class="data-header">
-                <h3>${esc(f.title)}</h3>
-              </div>
-              <p class="meta-text" style="font-size:0.8rem; margin-bottom:1rem;">Added: ${fmtDate(f.saved_at)}</p>
-              <div class="actions" style="margin-top:auto; padding-top:1rem; border-top:1px solid #f0f0f0;">
-                <a href="#/browse/view/${f.project_id}" class="btn btn-elegant" style="flex: 1;">View Again</a>
-                <button class="btn btn-danger" data-x="${f.project_id}" style="border:none;">Remove</button>
-              </div>
+          <div class="data-card" style="padding: 1.5rem;">
+            <div class="data-header">
+              <h3>${esc(f.title)}</h3>
+            </div>
+            <p class="meta-text" style="font-size:0.8rem; margin-bottom:1rem;">Added: ${fmtDate(f.saved_at)}</p>
+            <div class="actions" style="margin-top:auto; padding-top:1rem; border-top:1px solid #f0f0f0;">
+              <a href="#/browse/view/${f.project_id}" class="btn btn-elegant" style="flex: 1;">View Again</a>
+              <button class="btn btn-danger" data-x="${f.project_id}" style="border:none;">Remove</button>
             </div>
           </div>
         `).join('') + `</div>`;
@@ -810,7 +857,7 @@ async function favouritesList() {
 // =============================================================================
 async function categoriesList() {
   checkFlash();
-  shell(`${pageHeader('Taxonomy Management', 'Curate standard design categories ensuring systemic consistency.')} <div class="actions" style="justify-content: center; margin-bottom: 2rem;"> <a href="#/categories/create" class="btn btn-elegant">+ Create New Category</a> </div> <div class="search-bar"> <input id="q" placeholder="Search taxonomies..." style="flex:1;" /> <button class="btn btn-elegant" id="s">Search</button> <button class="btn btn-outline" id="r">Reset</button> </div> <div id="tb"></div>`);
+  shell(`${pageHeader('Category Management', 'Curate standard design categories ensuring systemic consistency.')} <div class="actions" style="justify-content: center; margin-bottom: 2rem;"> <a href="#/categories/create" class="btn btn-elegant">+ Create New Category</a> </div> <div class="search-bar"> <input id="q" placeholder="Search categories..." style="flex:1;" /> <button class="btn btn-elegant" id="s">Search</button> <button class="btn btn-outline" id="r">Reset</button> </div> <div id="tb"></div>`);
   
   const reload = async q => {
     try {
@@ -841,7 +888,7 @@ async function categoriesList() {
   
   $('#tb').onclick = async e => {
     const di = e.target.getAttribute('data-d');
-    if (di && confirm('Eradicate Category #' + di + '?')) {
+    if (di && confirm('Delete this category?')) {
       try {
         await api('/api/categories/' + di, { method: 'DELETE' });
         showToast('Category deleted successfully!');
@@ -853,7 +900,7 @@ async function categoriesList() {
 }
 
 async function categoriesCreate() {
-  shell(`${pageHeader('Create IDP Category', 'Standardize a new structural category for portfolios.')} <form id="f" style="max-width: 600px; margin: 0 auto;"> <div class="form-group"><label>Classification Title</label><input name="category_name" required/></div> <div class="form-group"><label>Architectural Description</label><textarea name="description" rows="4"></textarea></div> <p id="m" class="error"></p> <div class="actions" style="justify-content: center; margin-top: 2rem;"> <button type="submit" class="btn btn-elegant">Create IDP Category</button> <a href="#/categories" class="btn btn-outline">Cancel</a> </div> </form>`);
+  shell(`${pageHeader('Create IDP Category', 'Standardize a new classification for portfolios.')} <form id="f" style="max-width: 600px; margin: 0 auto;"> <div class="form-group"><label>Category Name</label><input name="category_name" required/></div> <div class="form-group"><label>Description</label><textarea name="description" rows="4"></textarea></div> <p id="m" class="error"></p> <div class="actions" style="justify-content: center; margin-top: 2rem;"> <button type="submit" class="btn btn-elegant">Create IDP Category</button> <a href="#/categories" class="btn btn-outline">Cancel</a> </div> </form>`);
   
   $('#f').onsubmit = async e => {
     e.preventDefault();
@@ -870,14 +917,15 @@ async function categoriesCreate() {
 async function categoriesView(id) {
   try {
     const r = await api('/api/categories/' + id);
-    shell(`${pageHeader('View IDP Category', esc(r.category.category_name))} <div style="max-width: 600px; margin: 0 auto; background: #fff; padding: 2rem; border-radius: 8px; border: 1px solid #f0f0f0;"> <p class="meta-text" style="font-size:1.1rem; margin-bottom:1rem;"><strong>Registry ID:</strong> #${r.category.category_id}</p> <p class="meta-text" style="font-size:1.1rem; margin-bottom:1rem; white-space:pre-line;"><strong>Description:</strong><br>${esc(r.category.description || 'N/A')}</p> <div class="actions" style="margin-top: 2rem; justify-content:center;"> <a href="#/categories" class="btn btn-outline">Return to Taxonomy List</a> </div> </div>`);
+    shell(`${pageHeader('View IDP Category', 'Reviewing details for ' + esc(r.category.category_name))} <div style="max-width: 600px; margin: 0 auto; background: #fff; padding: 2rem; border-radius: 8px; border: 1px solid #f0f0f0;"> <p class="meta-text" style="font-size:1.1rem; margin-bottom:1rem;"><strong>Registry ID:</strong> #${r.category.category_id}</p> <p class="meta-text" style="font-size:1.1rem; margin-bottom:1rem;"><strong>Category Name:</strong> ${esc(r.category.category_name)}</p> <p class="meta-text" style="font-size:1.1rem; margin-bottom:1rem; white-space:pre-line;"><strong>Description:</strong><br>${esc(r.category.description || 'N/A')}</p> <div class="actions" style="margin-top: 2rem; justify-content:center;"> <a href="#/categories" class="btn btn-outline">Return to Categories List</a> </div> </div>`);
   } catch (ex) { shell(`<p class="error">❌ ${ex.message}</p>`); }
 }
 
 async function categoriesEdit(id) {
   try {
     const r = await api('/api/categories/' + id);
-    shell(`${pageHeader('Update IDP Category', 'Amending ' + esc(r.category.category_name))} <form id="f" style="max-width: 600px; margin: 0 auto;"> <div class="form-group"><label>Classification Title</label><input name="category_name" value="${esc(r.category.category_name)}" required/></div> <div class="form-group"><label>Architectural Description</label><textarea name="description" rows="4">${esc(r.category.description || '')}</textarea></div> <p id="m" class="error"></p> <div class="actions" style="justify-content: center; margin-top: 2rem;"> <button type="submit" class="btn btn-elegant">Update IDP Category</button> <a href="#/categories" class="btn btn-outline">Cancel</a> </div> </form>`);
+    // [ITEM 2] Subtitle intentionally empty — no dynamic category name
+    shell(`${pageHeader('Update IDP Category', '')} <form id="f" style="max-width: 600px; margin: 0 auto;"> <div class="form-group"><label>Category Name</label><input name="category_name" value="${esc(r.category.category_name)}" required/></div> <div class="form-group"><label>Description</label><textarea name="description" rows="4">${esc(r.category.description || '')}</textarea></div> <p id="m" class="error"></p> <div class="actions" style="justify-content: center; margin-top: 2rem;"> <button type="submit" class="btn btn-elegant">Update IDP Category</button> <a href="#/categories" class="btn btn-outline">Cancel</a> </div> </form>`);
     
     $('#f').onsubmit = async e => {
       e.preventDefault();
@@ -897,24 +945,24 @@ async function categoriesEdit(id) {
 // =============================================================================
 async function reports() {
   shell(`
-    ${pageHeader('Executive Platform Analytics', 'Synthesize total ecosystem performance including acquisition & engagement.')}
+    ${pageHeader('Executive Platform Analytics', 'View platform performance and engagement metrics.')}
     <div class="actions" style="justify-content: center; margin-bottom: 2rem;">
-       <button class="btn btn-elegant" data-p="daily">Daily Pulse</button> 
-       <button class="btn btn-elegant" data-p="weekly">Weekly Rollup</button> 
-       <button class="btn btn-elegant" data-p="monthly">Monthly Synthesis</button>
+       <button class="btn btn-elegant" data-p="daily">Daily Report</button> 
+       <button class="btn btn-elegant" data-p="weekly">Weekly Report</button> 
+       <button class="btn btn-elegant" data-p="monthly">Monthly Report</button>
      </div>
-     <h2 id="t" style="text-align:center; font-weight:300; margin-bottom:2rem;">Awaiting Generation Parameters</h2>
+     <h2 id="t" style="text-align:center; font-weight:300; margin-bottom:2rem;">Select a report to generate</h2>
      <p id="m" class="error"></p>
      <div id="sm"></div>
      <div id="tb-wrap" style="display:none; margin-top:3rem;">
-       <h2 style="font-weight:400; font-size:1.5rem; margin-bottom:1rem;">Leaderboard: Traffic & Engagement</h2>
+       <h2 style="font-weight:400; font-size:1.5rem; margin-bottom:1rem;">Top Projects</h2>
        <table>
          <thead>
            <tr>
-             <th>Published Asset</th>
-             <th>Operating Entity</th>
-             <th>Traffic (Views)</th>
-             <th>Conversions (Saves)</th>
+             <th>Project Title</th>
+             <th>Company</th>
+             <th>Views</th>
+             <th>Saves</th>
            </tr>
          </thead>
          <tbody id="tb"></tbody>
@@ -930,25 +978,27 @@ async function reports() {
     try {
       const r = await api('/api/reports/' + p);
       const tEl = $('#t'); if (!tEl) return;
-      tEl.textContent = p.toUpperCase() + ' PERFORMANCE SYNTHESIS';
+      tEl.textContent = p.charAt(0).toUpperCase() + p.slice(1) + ' Performance Report';
       
       const smEl = $('#sm'); if (!smEl) return;
+      
+      // Simplified card labels
       smEl.innerHTML = `
          <div class="data-grid" style="grid-template-columns: repeat(4, 1fr); margin-top:0;">
            <div class="data-card" style="padding: 2rem; text-align:center; border-top: 4px solid var(--primary);">
-             <span style="color:var(--text-muted); font-size:0.9rem; text-transform:uppercase; letter-spacing:1px;">User Acquisition</span><br>
+             <span style="color:var(--text-muted); font-size:0.9rem; text-transform:uppercase; letter-spacing:1px;">New Users</span><br>
              <strong style="font-size:3rem; font-weight:300;">${r.summary.new_users}</strong>
            </div>
            <div class="data-card" style="padding: 2rem; text-align:center; border-top: 4px solid var(--primary);">
-             <span style="color:var(--text-muted); font-size:0.9rem; text-transform:uppercase; letter-spacing:1px;">Traffic Volume</span><br>
+             <span style="color:var(--text-muted); font-size:0.9rem; text-transform:uppercase; letter-spacing:1px;">Total Views</span><br>
              <strong style="font-size:3rem; font-weight:300;">${r.summary.project_views}</strong>
            </div>
            <div class="data-card" style="padding: 2rem; text-align:center; border-top: 4px solid var(--primary);">
-             <span style="color:var(--text-muted); font-size:0.9rem; text-transform:uppercase; letter-spacing:1px;">Lead Intent (Saves)</span><br>
+             <span style="color:var(--text-muted); font-size:0.9rem; text-transform:uppercase; letter-spacing:1px;">Total Saves</span><br>
              <strong style="font-size:3rem; font-weight:300;">${r.summary.shortlists}</strong>
            </div>
            <div class="data-card" style="padding: 2rem; text-align:center; border-top: 4px solid var(--primary);">
-             <span style="color:var(--text-muted); font-size:0.9rem; text-transform:uppercase; letter-spacing:1px;">Asset Velocity</span><br>
+             <span style="color:var(--text-muted); font-size:0.9rem; text-transform:uppercase; letter-spacing:1px;">New Projects</span><br>
              <strong style="font-size:3rem; font-weight:300;">${r.summary.new_projects}</strong>
            </div>
          </div>
@@ -958,16 +1008,17 @@ async function reports() {
       tbWrap.style.display = 'block';
       
       const tbEl = $('#tb'); if (!tbEl) return;
+      // Cleaned up table rows and changed to simple badges
       tbEl.innerHTML = r.topProjects.map(x => `
         <tr>
           <td style="font-weight:500;">${esc(x.title)}</td>
           <td style="color:var(--text-muted);">${esc(x.company_name)}</td>
-          <td><span class="badge badge-neutral">👁️ ${x.views}</span></td>
-          <td><span class="badge badge-success">⭐ ${x.shortlists}</span></td>
+          <td><span class="badge badge-neutral">${x.views}</span></td>
+          <td><span class="badge badge-success">${x.shortlists}</span></td>
         </tr>
       `).join('');
       showMsg('m', '', false);
-      showToast(`${p.charAt(0).toUpperCase() + p.slice(1)} report generated successfully!`);
+      showToast(`${p.charAt(0).toUpperCase() + p.slice(1)} Report generated successfully!`);
     } catch (ex) { showMsg('m', '❌ ' + ex.message, true); }
   };
 }

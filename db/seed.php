@@ -44,7 +44,7 @@ try {
     }
     echo "✅ 4 Accounts created\n";
 
-    // 4. Company (Updated to 8-digit phone number)
+    // 4. Company
     $row = q1(
         'INSERT INTO company (owner_id, company_name, address, contact_no) VALUES ($1, $2, $3, $4) RETURNING company_id',
         [$uids['Interior Designer'], 'My Design Studio', '123 Orchard Road, Singapore', '91234567']
@@ -58,16 +58,17 @@ try {
         $catIds[] = (int)$row['category_id'];
     }
 
-    // 6. Projects
+    // 6. Projects (Updated: Removed date and image_url)
     $projects = [
-        ['Modern BTO Renovation',   'A sleek 4-room BTO flat.',            'Ongoing',   '/img/sample.jpg'],
-        ['Luxury Condo Makeover',   'High-end interior design.',            'Completed', '/img/sample.jpg'],
-        ['Minimalist Office Space', 'Clean lines and ergonomic design.',    'Ongoing',   '/img/sample.jpg'],
+        ['Modern BTO Renovation',   'A sleek 4-room BTO flat.',            'Ongoing'],
+        ['Luxury Condo Makeover',   'High-end interior design.',            'Completed'],
+        ['Minimalist Office Space', 'Clean lines and ergonomic design.',    'Ongoing'],
     ];
+    
     foreach ($projects as $p) {
         $row = q1(
-            'INSERT INTO project (company_id, title, description, status, image_url) VALUES ($1, $2, $3, $4, $5) RETURNING project_id',
-            [$companyId, $p[0], $p[1], $p[2], $p[3]]
+            'INSERT INTO project (company_id, title, description, status) VALUES ($1, $2, $3, $4) RETURNING project_id',
+            [$companyId, $p[0], $p[1], $p[2]]
         );
         $pid = (int)$row['project_id'];
         ex('INSERT INTO project_category (project_id, category_id) VALUES ($1, $2)', [$pid, $catIds[array_rand($catIds)]]);
