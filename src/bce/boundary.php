@@ -75,8 +75,17 @@ $r->put   ('/categories/:id',       [$auth, $M], fn($p) => UpdateCategoryControl
 $r->delete('/categories/:id',       [$auth, $M], fn($p) => DeleteCategoryController::remove($p));
 
 // -------- US #46–#48 – Reports (Manager) --------
-$r->get ('/reports/daily',   [$auth, $M], fn() => DailyReportController::generate());
-$r->get ('/reports/weekly',  [$auth, $M], fn() => WeeklyReportController::generate());
-$r->get ('/reports/monthly', [$auth, $M], fn() => MonthlyReportController::generate());
-
+$r->get ('/reports/:type', [$auth, $M], function (array $p) {
+    $type = strtolower((string)($p['type'] ?? ''));
+    switch ($type) {
+        case 'daily':   DailyReportController::generate();   return;
+        case 'weekly':  WeeklyReportController::generate();  return;
+        case 'monthly': MonthlyReportController::generate(); return;
+    }
+    display_error(
+        400,
+        'Invalid report type. Expected daily, weekly or monthly.',
+        ['type' => $type, 'allowed' => ['daily', 'weekly', 'monthly']]
+    );
+});
 return $r;
