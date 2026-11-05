@@ -6,7 +6,7 @@ function handle_error(Throwable $e, string $fallback = 'An unexpected system err
     error_log('[Backend Error] ' . $e->getMessage());
     $code = $e instanceof PDOException ? (string)$e->getCode() : '';
     if ($code === '23505') { json_out(409, ['error' => 'A record with this name or email already exists. Please use a different one.']); return; }
-    if ($code === '23503') { json_out(400, ['error' => 'Cannot complete action because this record is currently in use by another part of the system.']); return; } // [ITEM 3] Verified — wrong error message fixed
+    if ($code === '23503') { json_out(400, ['error' => 'Cannot complete action because this record is currently in use by another part of the system.']); return; }
     if ($code === '23502') { json_out(400, ['error' => 'A required field was left blank. Please fill in all mandatory fields.']); return; }
     json_out(500, ['error' => $fallback]);
 }
@@ -303,8 +303,9 @@ class CreateProjectController {
             $c = CompanyInfo::findById($b['company_id'] ?? null);
             if (!$c || (int)$c['owner_id'] !== (int)session_user()['account_id']) { json_out(403, ['error' => 'Invalid company selected or you do not own it.']); return; }
             
-            if (empty($b['title']) || empty($b['status']) || empty($b['description'])) { 
-                json_out(400, ['error' => 'Please fill up all fields: Title, Status, and Description.']); 
+            // FIX: Removed 'status' from validation
+            if (empty($b['title']) || empty($b['description'])) { 
+                json_out(400, ['error' => 'Please fill up all fields: Title and Description.']); 
                 return; 
             }
 
@@ -325,8 +326,9 @@ class CreateCompletedProjController {
             $c = CompanyInfo::findById($b['company_id'] ?? null);
             if (!$c || (int)$c['owner_id'] !== (int)session_user()['account_id']) { json_out(403, ['error' => 'Invalid company selected.']); return; }
             
-            if (empty($b['title']) || empty($b['status']) || empty($b['description'])) { 
-                json_out(400, ['error' => 'Please fill up all fields: Title, Status, and Description.']); 
+            // FIX: Removed 'status' from validation
+            if (empty($b['title']) || empty($b['description'])) { 
+                json_out(400, ['error' => 'Please fill up all fields: Title and Description.']); 
                 return; 
             }
 
@@ -355,43 +357,43 @@ class ViewProjectController {
     }
 }
 
-// [ITEM 6 / ITEM 16] Update no longer requires or accepts company_id
 class UpdateProjectController {
     public static function update(array $params): void {
         try {
             if (!ProjectAuth::assertOwner($params['id'], session_user()['account_id'])) return;
             $b = req_body();
             
-            if (empty($b['title']) || empty($b['status']) || empty($b['description'])) { 
-                json_out(400, ['error' => 'Please fill up all fields: Title, Status, and Description.']); 
+            // FIX: Removed 'status' from validation
+            if (empty($b['title']) || empty($b['description'])) { 
+                json_out(400, ['error' => 'Please fill up all fields: Title and Description.']); 
                 return; 
             }
 
             json_out(200, ['project' => Project::updateProject($params['id'], [
                 'title'       => $b['title'],
                 'description' => $b['description'],
-                'status'      => $b['status']
+                'status'      => $b['status'] ?? null
             ])]);
         } catch (Throwable $e) { handle_error($e); }
     }
 }
 
-// [ITEM 6 / ITEM 16] Same simplification as UpdateProjectController
 class UpdateCompletedProjController {
     public static function update(array $params): void {
         try {
             if (!ProjectAuth::assertOwner($params['id'], session_user()['account_id'])) return;
             $b = req_body();
             
-            if (empty($b['title']) || empty($b['status']) || empty($b['description'])) { 
-                json_out(400, ['error' => 'Please fill up all fields: Title, Status, and Description.']); 
+            // FIX: Removed 'status' from validation
+            if (empty($b['title']) || empty($b['description'])) { 
+                json_out(400, ['error' => 'Please fill up all fields: Title and Description.']); 
                 return; 
             }
 
             json_out(200, ['project' => Project::updateProject($params['id'], [
                 'title'       => $b['title'],
                 'description' => $b['description'],
-                'status'      => $b['status']
+                'status'      => $b['status'] ?? null
             ])]);
         } catch (Throwable $e) { handle_error($e); }
     }
@@ -437,7 +439,6 @@ class SearchCompletedController {
     }
 }
 
-// [ITEMS 8 & 9] New controller — cross-company search for a designer's own projects
 class SearchAllProjectsController {
     public static function search(): void {
         $q = $_GET['q'] ?? '';
@@ -451,7 +452,6 @@ class SearchAllProjectsController {
     }
 }
 
-// [ITEMS 8 & 9] New controller — interest metrics across all of a designer's companies
 class SearchAllInterestController {
     public static function search(): void {
         json_out(200, ['interest' => Project::interestAllByOwner(session_user()['account_id'])]);
