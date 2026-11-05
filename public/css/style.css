@@ -76,7 +76,6 @@ nav button:hover { background-color: white; color: black; }
   padding: 0 2rem;
 }
 
-/* Page Headers */
 .page-header {
   text-align: center;
   margin-bottom: 3rem;
@@ -304,4 +303,128 @@ tr:last-child td { border-bottom: none; }
 @keyframes fadeOut {
   from { opacity: 1; }
   to { opacity: 0; }
+}
+
+/* =========================================
+   DISPLAY ERROR SYSTEM  [NEW]
+   Styles for:
+     - .error-alert         → page-level card from backend `html`
+     - .error-alert--inline → inline form message (safe inside <p>)
+     - .toast.display-toast → structured error toast
+   Severities: info / warning / error / critical
+   ========================================= */
+
+/* --- Page-level and inline alert ---------- */
+.error-alert {
+  display: flex;
+  gap: 0.75rem;
+  padding: 0.9rem 1.1rem;
+  border-left: 4px solid #888;
+  border-radius: 6px;
+  background: #fff;
+  font-family: inherit;
+  text-align: left;
+}
+
+.error-alert[data-severity="info"]     { border-color: #3b82f6; background: #eff6ff; }
+.error-alert[data-severity="warning"]  { border-color: #f59e0b; background: #fffbeb; }
+.error-alert[data-severity="error"]    { border-color: #ef4444; background: #fef2f2; }
+.error-alert[data-severity="critical"] { border-color: #7c2d12; background: #fef2f2; }
+
+.error-alert__icon {
+  font-size: 1.2rem;
+  line-height: 1.2;
+  flex-shrink: 0;
+}
+
+.error-alert__body {
+  display: flex;
+  flex-direction: column;
+  gap: 0.15rem;
+}
+
+.error-alert__title {
+  font-weight: 600;
+  font-size: 0.95rem;
+  letter-spacing: 0.3px;
+}
+
+.error-alert__message {
+  margin: 0;
+  color: #374151;
+  font-size: 0.95rem;
+  line-height: 1.4;
+}
+
+/* Inline variant — used inside a <p id="m"> form slot */
+.error-alert--inline {
+  display: inline-flex;
+  padding: 0.65rem 0.85rem;
+  width: 100%;
+}
+
+/* Neutralise the legacy .error text-mode styling when the slot holds an alert */
+p.error:has(.error-alert) {
+  padding: 0;
+  color: inherit;
+  font-weight: inherit;
+  text-align: left;
+}
+
+/* --- Structured error toast --------------- */
+.toast.display-toast {
+  background-color: #374151;
+  justify-content: flex-start;
+  align-items: center;
+  padding: 1rem 1.5rem;
+  font-size: 1rem;
+  font-weight: 400;
+  text-align: left;
+  gap: 0.85rem;
+}
+
+.toast.display-toast[data-severity="info"]     { background-color: #2563eb; }
+.toast.display-toast[data-severity="warning"]  { background-color: #d97706; }
+.toast.display-toast[data-severity="error"]    { background-color: #dc2626; }
+.toast.display-toast[data-severity="critical"] { background-color: #7c2d12; }
+
+.toast.display-toast .toast__icon {
+  font-size: 1.4rem;
+  flex-shrink: 0;
+}
+
+.toast.display-toast .toast__body {
+  display: flex;
+  flex-direction: column;
+  gap: 0.15rem;
+  flex-grow: 1;
+}
+
+.toast.display-toast .toast__title {
+  font-weight: 600;
+  font-size: 1rem;
+  letter-spacing: 0.3px;
+}
+
+.toast.display-toast .toast__message {
+  font-size: 0.95rem;
+  opacity: 0.95;
+  line-height: 1.4;
+}
+
+.toast.display-toast .toast__close {
+  background: transparent;
+  border: none;
+  color: rgba(255, 255, 255, 0.85);
+  font-size: 1.4rem;
+  line-height: 1;
+  cursor: pointer;
+  padding: 0.15rem 0.5rem;
+  border-radius: 4px;
+  transition: background 0.2s ease, color 0.2s ease;
+}
+
+.toast.display-toast .toast__close:hover {
+  background: rgba(255, 255, 255, 0.15);
+  color: #fff;
 }

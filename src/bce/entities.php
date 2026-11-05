@@ -272,55 +272,48 @@ class Category
     public static function findCategory(string $t): array { return q('SELECT * FROM category WHERE category_name ILIKE $1 ORDER BY category_name', ['%' . $t . '%']); }
 }
 
-class Report
-{
-    public static function generate(string $p): array
-    {
-        $tz = 'Asia/Singapore';
+class Report {
+    public static function generate(string $period): array {
+        $interval = match($period) {
+            'daily' => '1 day',
+            'weekly' => '7 days',
+            'monthly' => '30 days',
+            default => '1 day'
+        };
 
-        // 1. Build the exact time conditions based on the requested period
-        if ($p === 'daily') {
-            $condCreated = "(created_at AT TIME ZONE '$tz')::date = (now() AT TIME ZONE '$tz')::date";
-            $condViewed  = "(viewed_at AT TIME ZONE '$tz')::date = (now() AT TIME ZONE '$tz')::date";
-            $condSaved   = "(saved_at AT TIME ZONE '$tz')::date = (now() AT TIME ZONE '$tz')::date";
-        } elseif ($p === 'weekly') {
-            $condCreated = "(created_at AT TIME ZONE '$tz') >= date_trunc('week', now() AT TIME ZONE '$tz')";
-            $condViewed  = "(viewed_at AT TIME ZONE '$tz') >= date_trunc('week', now() AT TIME ZONE '$tz')";
-            $condSaved   = "(saved_at AT TIME ZONE '$tz') >= date_trunc('week', now() AT TIME ZONE '$tz')";
-        } else { // monthly
-            $condCreated = "(created_at AT TIME ZONE '$tz') >= date_trunc('month', now() AT TIME ZONE '$tz')";
-            $condViewed  = "(viewed_at AT TIME ZONE '$tz') >= date_trunc('month', now() AT TIME ZONE '$tz')";
-            $condSaved   = "(saved_at AT TIME ZONE '$tz') >= date_trunc('month', now() AT TIME ZONE '$tz')";
-        }
+        $newUsers = q1("SELECT COUNT(*) as count FROM user_account WHERE created_at >= NOW() - INTERVAL '$interval'");
+        $newProjects = q1("SELECT COUNT(*) as count FROM project WHERE created_at >= NOW() - INTERVAL '$interval'");
+        $views = q1("SELECT COUNT(*) as count FROM project_view WHERE viewed_at >= NOW() - INTERVAL '$interval'");
+        $saves = q1("SELECT COUNT(*) as count FROM favourite WHERE saved_at >= NOW() - INTERVAL '$interval'");
 
-        // 2. Fetch the Summary Cards (New Users, Total Views, Total Saves, New Projects)
-        $summary = q1(
-            "SELECT
-                (SELECT COUNT(*)::int FROM user_account WHERE $condCreated) AS new_users,
-                (SELECT COUNT(*)::int FROM project_view WHERE $condViewed)  AS project_views,
-                (SELECT COUNT(*)::int FROM favourite    WHERE $condSaved)   AS shortlists,
-                (SELECT COUNT(*)::int FROM project      WHERE $condCreated) AS new_projects",
-            []
-        );
+        $topProjects = q("
+            SELECT 
+                p.title, 
+                c.company_name, 
+                COUNT(DISTINCT v.view_id) as views, 
+                COUNT(DISTINCT f.favourite_id) as shortlists
+            FROM project p
+            JOIN company c ON p.company_id = c.company_id
+            LEFT JOIN project_view v ON p.project_id = v.project_id
+            LEFT JOIN favourite f ON p.project_id = f.project_id
+            GROUP BY p.project_id, p.title, c.company_name
+            ORDER BY views DESC, shortlists DESC
+            LIMIT 10
+        ");
 
-        // 3. Fetch the Top Projects Leaderboard
-        $topProjects = q(
-            "SELECT p.title, c.company_name,
-                (SELECT COUNT(*)::int FROM project_view v 
-                  WHERE v.project_id = p.project_id AND $condViewed) AS views,
-                  
-                (SELECT COUNT(*)::int FROM favourite f 
-                  WHERE f.project_id = p.project_id AND $condSaved) AS shortlists
-               FROM project p 
-               JOIN company c ON p.company_id = c.company_id 
-               ORDER BY views DESC 
-               LIMIT 10",
-            []
-        );
-        
+        $topProjects = array_map(function($row) {
+            $row['views'] = (int)$row['views'];
+            $row['shortlists'] = (int)$row['shortlists'];
+            return $row;
+        }, $topProjects);
+
         return [
-            'period' => $p, 
-            'summary' => $summary, 
+            'summary' => [
+                'new_users' => (int)($newUsers['count'] ?? 0),
+                'project_views' => (int)($views['count'] ?? 0),
+                'shortlists' => (int)($saves['count'] ?? 0),
+                'new_projects' => (int)($newProjects['count'] ?? 0)
+            ],
             'topProjects' => $topProjects
         ];
     }

@@ -75,6 +75,8 @@ $r->put   ('/categories/:id',       [$auth, $M], fn($p) => UpdateCategoryControl
 $r->delete('/categories/:id',       [$auth, $M], fn($p) => DeleteCategoryController::remove($p));
 
 // -------- US #46–#48 – Reports (Manager) --------
-$r->get   ('/reports/:period', [$auth, $M], fn($p) => ReportController::generate($p));
+$r->get ('/reports/daily',   [$auth, $M], fn() => DailyReportController::generate());
+$r->get ('/reports/weekly',  [$auth, $M], fn() => WeeklyReportController::generate());
+$r->get ('/reports/monthly', [$auth, $M], fn() => MonthlyReportController::generate());
 
 return $r;

@@ -42,6 +42,7 @@ CREATE TABLE project (
   title VARCHAR(200) NOT NULL, 
   description TEXT NOT NULL, 
   status VARCHAR(20) NOT NULL DEFAULT 'Ongoing' CHECK (status IN ('Ongoing','Completed')), 
+  date DATE, 
   created_at TIMESTAMPTZ NOT NULL DEFAULT now(), 
   updated_at TIMESTAMPTZ NOT NULL DEFAULT now()
 );
