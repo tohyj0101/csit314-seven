@@ -339,11 +339,10 @@ class CreateCompanyController {
             }
 
             json_out(201, ['company' => CompanyInfo::saveCompany([
-                'owner_id'       => session_user()['account_id'],
-                'company_name'   => $b['company_name'],
-                'contact_person' => $b['contact_person'] ?? null,
-                'address'        => $b['address'] ?? null,
-                'contact_no'     => $b['contact_no'] ?? null,
+                'owner_id'     => session_user()['account_id'],
+                'company_name' => $b['company_name'],
+                'address'      => $b['address'] ?? null,
+                'contact_no'   => $b['contact_no'] ?? null,
             ])]);
         } catch (Throwable $e) { handle_error($e, 'Failed to create company profile.'); }
     }
@@ -364,10 +363,16 @@ class UpdateCompanyController {
         try {
             $c = CompanyInfo::findById($params['id']);
             if (!$c) { display_error(404, 'Company record not found.'); return; }
-            if ((int)$c['owner_id'] !== (int)session_user()['account_id']) { display_error(403, 'You do not have permission to edit this company.'); return; }
+            if ((int)$c['owner_id'] !== (int)session_user()['account_id']) {
+                display_error(403, 'You do not have permission to edit this company.');
+                return;
+            }
 
             $b = req_body();
-            if (empty($b['company_name'])) { display_error(400, 'Company Name cannot be left blank.', ['field' => 'company_name']); return; }
+            if (empty($b['company_name'])) {
+                display_error(400, 'Company Name cannot be left blank.', ['field' => 'company_name']);
+                return;
+            }
 
             $contactNo = $b['contact_no'] ?? '';
             if (!empty($contactNo)) {
@@ -434,24 +439,19 @@ class CreateProjectController {
         try {
             $b = req_body();
             $c = CompanyInfo::findById($b['company_id'] ?? null);
-            if (!$c || (int)$c['owner_id'] !== (int)session_user()['account_id']) { display_error(403, 'Invalid company selected or you do not own it.', ['field' => 'company_id']); return; }
-
+            if (!$c || (int)$c['owner_id'] !== (int)session_user()['account_id']) {
+                display_error(403, 'Invalid company selected or you do not own it.', ['field' => 'company_id']);
+                return;
+            }
             if (empty($b['title']) || empty($b['description'])) {
                 display_error(400, 'Please fill up all fields: Title and Description.');
                 return;
             }
-            if (isset($b['number_of_rooms']) && $b['number_of_rooms'] !== '' && (!is_numeric($b['number_of_rooms']) || (int)$b['number_of_rooms'] < 1)) {
-                display_error(400, 'Number of rooms must be a positive integer.', ['field' => 'number_of_rooms']);
-                return;
-            }
-
             json_out(201, ['project' => Project::saveProject([
-                'company_id'      => (int)$b['company_id'],
-                'title'           => $b['title'],
-                'description'     => $b['description'],
-                'status'          => (($b['status'] ?? '') === 'Completed') ? 'Completed' : 'Ongoing',
-                'property_size'   => $b['property_size'] ?? null,
-                'number_of_rooms' => $b['number_of_rooms'] ?? null,
+                'company_id'  => (int)$b['company_id'],
+                'title'       => $b['title'],
+                'description' => $b['description'],
+                'status'      => (($b['status'] ?? '') === 'Completed') ? 'Completed' : 'Ongoing',
             ])]);
         } catch (Throwable $e) { handle_error($e); }
     }
@@ -463,24 +463,19 @@ class CreateCompletedProjController {
         try {
             $b = req_body();
             $c = CompanyInfo::findById($b['company_id'] ?? null);
-            if (!$c || (int)$c['owner_id'] !== (int)session_user()['account_id']) { display_error(403, 'Invalid company selected.', ['field' => 'company_id']); return; }
-
+            if (!$c || (int)$c['owner_id'] !== (int)session_user()['account_id']) {
+                display_error(403, 'Invalid company selected.', ['field' => 'company_id']);
+                return;
+            }
             if (empty($b['title']) || empty($b['description'])) {
                 display_error(400, 'Please fill up all fields: Title and Description.');
                 return;
             }
-            if (isset($b['number_of_rooms']) && $b['number_of_rooms'] !== '' && (!is_numeric($b['number_of_rooms']) || (int)$b['number_of_rooms'] < 1)) {
-                display_error(400, 'Number of rooms must be a positive integer.', ['field' => 'number_of_rooms']);
-                return;
-            }
-
             json_out(201, ['project' => Project::saveProject([
-                'company_id'      => (int)$b['company_id'],
-                'title'           => $b['title'],
-                'description'     => $b['description'],
-                'status'          => 'Completed',
-                'property_size'   => $b['property_size'] ?? null,
-                'number_of_rooms' => $b['number_of_rooms'] ?? null,
+                'company_id'  => (int)$b['company_id'],
+                'title'       => $b['title'],
+                'description' => $b['description'],
+                'status'      => 'Completed',
             ])]);
         } catch (Throwable $e) { handle_error($e); }
     }
@@ -525,8 +520,6 @@ class UpdateProjectController {
                 display_error(400, 'Please fill up all fields: Title and Description.');
                 return;
             }
-            // If the caller is reassigning the project to another company,
-            // that target company must ALSO belong to this designer.
             if (!empty($b['company_id'])) {
                 $nc = CompanyInfo::findById((int)$b['company_id']);
                 if (!$nc || (int)$nc['owner_id'] !== (int)session_user()['account_id']) {
@@ -534,18 +527,12 @@ class UpdateProjectController {
                     return;
                 }
             }
-            if (isset($b['number_of_rooms']) && $b['number_of_rooms'] !== '' && (!is_numeric($b['number_of_rooms']) || (int)$b['number_of_rooms'] < 1)) {
-                display_error(400, 'Number of rooms must be a positive integer.', ['field' => 'number_of_rooms']);
-                return;
-            }
 
             json_out(200, ['project' => Project::updateProject($params['id'], [
-                'company_id'      => $b['company_id'] ?? null,
-                'title'           => $b['title'],
-                'description'     => $b['description'],
-                'status'          => $b['status'] ?? null,
-                'property_size'   => $b['property_size'] ?? null,
-                'number_of_rooms' => $b['number_of_rooms'] ?? null,
+                'company_id'  => $b['company_id'] ?? null,
+                'title'       => $b['title'],
+                'description' => $b['description'],
+                'status'      => $b['status'] ?? null,
             ])]);
         } catch (Throwable $e) { handle_error($e); }
     }
@@ -569,18 +556,12 @@ class UpdateCompletedProjController {
                     return;
                 }
             }
-            if (isset($b['number_of_rooms']) && $b['number_of_rooms'] !== '' && (!is_numeric($b['number_of_rooms']) || (int)$b['number_of_rooms'] < 1)) {
-                display_error(400, 'Number of rooms must be a positive integer.', ['field' => 'number_of_rooms']);
-                return;
-            }
 
             json_out(200, ['project' => Project::updateProject($params['id'], [
-                'company_id'      => $b['company_id'] ?? null,
-                'title'           => $b['title'],
-                'description'     => $b['description'],
-                'status'          => $b['status'] ?? null,
-                'property_size'   => $b['property_size'] ?? null,
-                'number_of_rooms' => $b['number_of_rooms'] ?? null,
+                'company_id'  => $b['company_id'] ?? null,
+                'title'       => $b['title'],
+                'description' => $b['description'],
+                'status'      => $b['status'] ?? null,
             ])]);
         } catch (Throwable $e) { handle_error($e); }
     }

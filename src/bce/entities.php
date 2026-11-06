@@ -138,12 +138,11 @@ class CompanyInfo
     public static function saveCompany(array $f): array
     {
         return q1(
-            'INSERT INTO company (owner_id, company_name, contact_person, address, contact_no)
-             VALUES ($1,$2,$3,$4,$5) RETURNING *',
+            'INSERT INTO company (owner_id, company_name, address, contact_no)
+             VALUES ($1,$2,$3,$4) RETURNING *',
             [
                 $f['owner_id'],
                 $f['company_name'],
-                $f['contact_person'] ?? null,
                 $f['address'] ?? null,
                 $f['contact_no'] ?? null,
             ]
@@ -164,16 +163,14 @@ class CompanyInfo
     {
         return q1(
             'UPDATE company
-                SET company_name   = $2,
-                    contact_person = $3,
-                    address        = $4,
-                    contact_no     = $5,
-                    updated_at     = now()
+                SET company_name = $2,
+                    address      = $3,
+                    contact_no   = $4,
+                    updated_at   = now()
               WHERE company_id = $1 RETURNING *',
             [
                 $id,
                 $f['company_name'],
-                $f['contact_person'] ?? null,
                 $f['address'] ?? null,
                 $f['contact_no'] ?? null,
             ]
@@ -190,7 +187,7 @@ class CompanyInfo
         return q(
             'SELECT * FROM company
               WHERE owner_id=$1
-                AND (company_name ILIKE $2 OR address ILIKE $2 OR contact_person ILIKE $2)
+                AND (company_name ILIKE $2 OR address ILIKE $2)
               ORDER BY company_id LIMIT 100',
             [$oid, '%' . $t . '%']
         );
@@ -202,15 +199,13 @@ class Project
     public static function saveProject(array $f): array
     {
         return q1(
-            'INSERT INTO project (company_id, title, description, status, property_size, number_of_rooms)
-             VALUES ($1,$2,$3,$4,$5,$6) RETURNING *',
+            'INSERT INTO project (company_id, title, description, status)
+             VALUES ($1,$2,$3,$4) RETURNING *',
             [
                 $f['company_id'],
                 $f['title'],
                 $f['description'],
                 $f['status'],
-                $f['property_size'] ?? null,
-                $f['number_of_rooms'] ?? null,
             ]
         );
     }
@@ -232,13 +227,11 @@ class Project
     {
         return q1(
             'UPDATE project
-                SET company_id      = COALESCE($2, company_id),
-                    title           = COALESCE($3, title),
-                    description     = COALESCE($4, description),
-                    status          = COALESCE($5, status),
-                    property_size   = COALESCE($6, property_size),
-                    number_of_rooms = COALESCE($7, number_of_rooms),
-                    updated_at      = now()
+                SET company_id  = COALESCE($2, company_id),
+                    title       = COALESCE($3, title),
+                    description = COALESCE($4, description),
+                    status      = COALESCE($5, status),
+                    updated_at  = now()
               WHERE project_id = $1 RETURNING *',
             [
                 $id,
@@ -246,8 +239,6 @@ class Project
                 $f['title'] ?? null,
                 $f['description'] ?? null,
                 $f['status'] ?? null,
-                $f['property_size'] ?? null,
-                $f['number_of_rooms'] ?? null,
             ]
         );
     }
@@ -274,10 +265,7 @@ class Project
         return q(
             'SELECT p.*, c.company_name
                FROM project p JOIN company c ON c.company_id=p.company_id
-              WHERE p.title ILIKE $1
-                 OR p.description ILIKE $1
-                 OR p.property_size ILIKE $1
-                 OR CAST(p.number_of_rooms AS TEXT) ILIKE $1
+              WHERE p.title ILIKE $1 OR p.description ILIKE $1
               ORDER BY p.project_id DESC LIMIT 100',
             ['%' . $t . '%']
         );
@@ -343,8 +331,7 @@ class Favourite
     public static function viewFavourites($cid): array
     {
         return q(
-            'SELECT f.favourite_id, p.project_id, p.title, p.description, p.status,
-                    p.property_size, p.number_of_rooms, f.saved_at
+            'SELECT f.favourite_id, p.project_id, p.title, p.description, p.status, f.saved_at
                FROM favourite f JOIN project p ON p.project_id=f.project_id
               WHERE f.customer_id=$1 ORDER BY f.saved_at DESC',
             [$cid]
@@ -354,8 +341,7 @@ class Favourite
     public static function searchFavourites($cid, string $t): array
     {
         return q(
-            'SELECT f.favourite_id, p.project_id, p.title, p.description, p.status,
-                    p.property_size, p.number_of_rooms, f.saved_at
+            'SELECT f.favourite_id, p.project_id, p.title, p.description, p.status, f.saved_at
                FROM favourite f JOIN project p ON p.project_id=f.project_id
               WHERE f.customer_id=$1 AND (p.title ILIKE $2 OR p.description ILIKE $2)',
             [$cid, '%' . $t . '%']

@@ -23,7 +23,6 @@ CREATE TABLE company (
   company_id SERIAL PRIMARY KEY,
   owner_id INT NOT NULL REFERENCES user_account(account_id) ON DELETE CASCADE,
   company_name VARCHAR(200) NOT NULL,
-  contact_person VARCHAR(100),
   address TEXT,
   contact_no VARCHAR(50),
   created_at TIMESTAMPTZ NOT NULL DEFAULT now(),
@@ -43,8 +42,6 @@ CREATE TABLE project (
   title VARCHAR(200) NOT NULL,
   description TEXT NOT NULL,
   status VARCHAR(20) NOT NULL DEFAULT 'Ongoing' CHECK (status IN ('Ongoing','Completed')),
-  property_size VARCHAR(100),
-  number_of_rooms INT,
   date DATE,
   created_at TIMESTAMPTZ NOT NULL DEFAULT now(),
   updated_at TIMESTAMPTZ NOT NULL DEFAULT now()

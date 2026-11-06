@@ -33,3 +33,8 @@ Follows the **Boundary-Control-Entity (BCE)** framework. Agile (Scrum) process.
 git clone https://github.com/tohyj0101/csit314-seven.git
 cd csit314-seven
 composer install
+
+### Quick start (Windows)
+
+```powershell
+.\demo.ps1
