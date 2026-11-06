@@ -4,3 +4,4 @@ composer.phar
 composer-setup.php
 .phpunit.result.cache
 cloudflared.exe
+demo.ps1
