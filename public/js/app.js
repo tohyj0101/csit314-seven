@@ -547,7 +547,7 @@ async function profilesEdit(id) {
 // =============================================================================
 async function companiesList() {
   checkFlash();
-  shell(`${pageHeader('Company Directory', 'Manage your associated business entities before attaching projects.')} <div class="actions" style="justify-content: center; margin-bottom: 2rem;"> <a href="#/companies/create" class="btn btn-elegant">+ Create Company</a> </div> <div class="search-bar"> <input id="q" placeholder="Search by company name, contact person, or address..." style="flex:1;" /> <button class="btn btn-elegant" id="s">Search</button> <button class="btn btn-outline" id="r">Reset</button> </div> <div id="tb"></div>`);
+  shell(`${pageHeader('Company Directory', 'Manage your associated business entities before attaching projects.')} <div class="actions" style="justify-content: center; margin-bottom: 2rem;"> <a href="#/companies/create" class="btn btn-elegant">+ Create Company</a> </div> <div class="search-bar"> <input id="q" placeholder="Search by company name or address..." style="flex:1;" /> <button class="btn btn-elegant" id="s">Search</button> <button class="btn btn-outline" id="r">Reset</button> </div> <div id="tb"></div>`);
 
   const reload = async q => {
     try {
@@ -558,7 +558,6 @@ async function companiesList() {
         tb.innerHTML = `<div class="data-grid">` + L.map(c => `
           <div class="data-card" style="padding: 1.5rem;">
             <h3 style="margin-bottom:1rem; font-size: 1.5rem; border-bottom: 1px solid #eee; padding-bottom:1rem;">${esc(c.company_name)}</h3>
-            ${c.contact_person ? `<p class="meta-text" style="display:flex; align-items:center; gap:8px;"><strong>👤</strong> <span>${esc(c.contact_person)}</span></p>` : ''}
             <p class="meta-text" style="display:flex; align-items:flex-start; gap:8px;"><strong>📍</strong> <span>${esc(c.address || 'Address Unlisted')}</span></p>
             <p class="meta-text" style="display:flex; align-items:center; gap:8px;"><strong>📞</strong> <span>${esc(c.contact_no || 'No Contact')}</span></p>
             <div class="actions" style="margin-top:auto; padding-top:1rem;">
@@ -593,7 +592,6 @@ async function companiesCreate() {
   shell(`${pageHeader('Create Company Information', 'Enter your corporate details to associate future interior design projects.')}
     <form id="f" style="max-width: 600px; margin: 0 auto;">
       <div class="form-group"><label>Registered Business Name</label><input name="company_name" placeholder="e.g., My Design Studio" required/></div>
-      <div class="form-group"><label>Contact Person</label><input name="contact_person" placeholder="e.g., Alice Tan"/></div>
       <div class="form-group"><label>Address</label><input name="address" placeholder="e.g., 123 Orchard Road" /></div>
       <div class="form-group">
         <label>Contact Hotline (8 Digits)</label>
@@ -630,7 +628,6 @@ async function companiesView(id) {
       <div style="max-width: 600px; margin: 0 auto; background: #fff; padding: 2rem; border-radius: 8px; border: 1px solid #f0f0f0;">
         <p class="meta-text" style="font-size:1.1rem; margin-bottom:1rem;"><strong>Company Name:</strong> ${esc(r.company.company_name)}</p>
         <p class="meta-text" style="font-size:1.1rem; margin-bottom:1rem;"><strong>Registry ID:</strong> #${r.company.company_id}</p>
-        ${r.company.contact_person ? `<p class="meta-text" style="font-size:1.1rem; margin-bottom:1rem;"><strong>Contact Person:</strong> ${esc(r.company.contact_person)}</p>` : ''}
         <p class="meta-text" style="font-size:1.1rem; margin-bottom:1rem;"><strong>Address:</strong> ${esc(r.company.address || 'Unlisted')}</p>
         <p class="meta-text" style="font-size:1.1rem; margin-bottom:1rem;"><strong>Contact:</strong> ${esc(r.company.contact_no || 'Unlisted')}</p>
         <div class="actions" style="margin-top: 2rem; justify-content:center;">
@@ -647,7 +644,6 @@ async function companiesEdit(id) {
     shell(`${pageHeader('Update Company Information', 'Updating details for ' + esc(r.company.company_name))}
       <form id="f" style="max-width: 600px; margin: 0 auto;">
         <div class="form-group"><label>Company name</label><input name="company_name" value="${esc(r.company.company_name)}" required/></div>
-        <div class="form-group"><label>Contact Person</label><input name="contact_person" value="${esc(r.company.contact_person || '')}"/></div>
         <div class="form-group"><label>Address</label><input name="address" value="${esc(r.company.address || '')}"/></div>
         <div class="form-group">
           <label>Contact Hotline (8 Digits)</label>
@@ -726,9 +722,6 @@ async function projectsList() {
       else {
         tb.innerHTML = `<div class="data-grid">` + L.map(p => {
           const i = im[p.project_id] || { views: 0, shortlists: 0 };
-          const meta = [];
-          if (p.property_size)   meta.push('📐 ' + esc(p.property_size));
-          if (p.number_of_rooms) meta.push('🚪 ' + esc(p.number_of_rooms) + ' rooms');
           return `
             <div class="data-card">
               <div class="data-info">
@@ -736,8 +729,7 @@ async function projectsList() {
                   <h3>${esc(p.title)}</h3>
                   <span class="badge ${p.status === 'Completed' ? 'badge-neutral' : 'badge-success'}">${esc(p.status)}</span>
                 </div>
-                ${p.company_name ? `<p class="meta-text" style="color:var(--primary); font-size:0.75rem; text-transform:uppercase; letter-spacing:1px; margin: 0.25rem 0 0.5rem;">${esc(p.company_name)}</p>` : ''}
-                ${meta.length ? `<p class="meta-text" style="margin-bottom:0.75rem;">${meta.join(' &middot; ')}</p>` : ''}
+                ${p.company_name ? `<p class="meta-text" style="color:var(--primary); font-size:0.75rem; text-transform:uppercase; letter-spacing:1px; margin: 0.25rem 0 0.75rem;">${esc(p.company_name)}</p>` : ''}
                 <div class="metrics-row">
                   <div class="metric-item">👁️ ${i.views} Views</div>
                   <div class="metric-item">⭐ ${i.shortlists} Saves</div>
@@ -791,8 +783,6 @@ async function projectsCreate() {
       </div>
       <div class="form-group"><label>Project Title</label><input name="title" placeholder="e.g., Modern BTO Renovation" required/></div>
       <div class="form-group"><label>Description</label><textarea name="description" rows="4" placeholder="Provide a brief overview of the design concept..." required></textarea></div>
-      <div class="form-group"><label>Property Size</label><input name="property_size" placeholder="e.g., 4-room, 120 sqm, 3-bedroom"/></div>
-      <div class="form-group"><label>Number of Rooms</label><input name="number_of_rooms" type="number" min="1" step="1" placeholder="e.g., 4"/></div>
       <div class="form-group">
         <label>Phase Status</label>
         <select name="status"><option value="Ongoing">Ongoing</option><option value="Completed">Completed</option></select>
@@ -808,9 +798,6 @@ async function projectsCreate() {
     e.preventDefault();
     const b = Object.fromEntries(new FormData(e.target));
     b.company_id = +b.company_id;
-    if (b.number_of_rooms === '' || b.number_of_rooms == null) delete b.number_of_rooms;
-    else b.number_of_rooms = +b.number_of_rooms;
-    if (!b.property_size) delete b.property_size;
     showMsg('m', 'Saving...', false);
     try {
       const endpoint = (b.status === 'Completed') ? '/api/projects/completed' : '/api/projects';
@@ -825,10 +812,6 @@ async function projectsView(id) {
   try {
     const r = await api('/api/projects/' + id);
     const p = r.project;
-    const meta = [];
-    if (p.property_size)   meta.push('<strong>Property Size:</strong> ' + esc(p.property_size));
-    if (p.number_of_rooms) meta.push('<strong>Rooms:</strong> ' + esc(p.number_of_rooms));
-
     shell(`
       ${pageHeader('View Interior Design Project', esc(p.title))}
       <div style="max-width: 800px; margin: 0 auto; background: #fff; border-radius: 8px; border: 1px solid #f0f0f0; overflow:hidden;">
@@ -836,7 +819,6 @@ async function projectsView(id) {
           <p class="meta-text" style="font-size:1.1rem; margin-bottom:1rem;">
             <span class="badge ${p.status === 'Completed' ? 'badge-neutral' : 'badge-success'}">${esc(p.status)}</span>
           </p>
-          ${meta.length ? `<p class="meta-text" style="font-size:1.05rem; margin-bottom:1.5rem;">${meta.join(' &middot; ')}</p>` : ''}
           <p class="meta-text" style="font-size:1.1rem; margin-bottom:1rem; white-space:pre-line;">${esc(p.description || 'No description provided.')}</p>
           <div class="actions" style="margin-top: 2rem; justify-content:center;">
             <a href="#/projects" class="btn btn-outline">Return to Portfolio</a>
@@ -866,8 +848,6 @@ async function projectsEdit(id) {
         </div>
         <div class="form-group"><label>Project Title</label><input name="title" value="${esc(p.title)}" required/></div>
         <div class="form-group"><label>Description</label><textarea name="description" rows="4" required>${esc(p.description || '')}</textarea></div>
-        <div class="form-group"><label>Property Size</label><input name="property_size" value="${esc(p.property_size || '')}" placeholder="e.g., 4-room, 120 sqm"/></div>
-        <div class="form-group"><label>Number of Rooms</label><input name="number_of_rooms" type="number" min="1" step="1" value="${esc(p.number_of_rooms || '')}" placeholder="e.g., 4"/></div>
         <div class="form-group">
           <label>Phase Status</label>
           <select name="status">
@@ -886,9 +866,6 @@ async function projectsEdit(id) {
       e.preventDefault();
       const b = Object.fromEntries(new FormData(e.target));
       b.company_id = +b.company_id;
-      if (b.number_of_rooms === '' || b.number_of_rooms == null) delete b.number_of_rooms;
-      else b.number_of_rooms = +b.number_of_rooms;
-      if (!b.property_size) delete b.property_size;
       showMsg('m', 'Saving...', false);
       try {
         await api(putEndpoint, { method: 'PUT', body: JSON.stringify(b) });
@@ -906,7 +883,7 @@ async function browseList() {
   shell(`
     ${pageHeader('Discovery Gallery', 'Discover visually striking interior design projects and save your inspirations.')}
     <div class="search-bar">
-      <input id="q" placeholder="Search by title, description, property size, or number of rooms..." style="flex:1;" />
+      <input id="q" placeholder="Search by project title or description..." style="flex:1;" />
       <button class="btn btn-elegant" id="s">Search</button>
       <button class="btn btn-outline" id="r">Reset</button>
     </div>
@@ -919,25 +896,19 @@ async function browseList() {
       const tb = $('#tb'); if (!tb) return;
       if (r.projects.length === 0) { tb.innerHTML = '<p class="error">❌ No projects discovered matching criteria.</p>'; }
       else {
-        tb.innerHTML = `<div class="data-grid">` + r.projects.map(p => {
-          const meta = [];
-          if (p.property_size)   meta.push('📐 ' + esc(p.property_size));
-          if (p.number_of_rooms) meta.push('🚪 ' + esc(p.number_of_rooms) + ' rooms');
-          return `
-            <div class="data-card" style="padding: 1.5rem;">
-              <div class="data-header">
-                <h3>${esc(p.title)}</h3>
-                <span class="badge ${p.status === 'Completed' ? 'badge-neutral' : 'badge-success'}">${esc(p.status)}</span>
-              </div>
-              <p class="meta-text" style="color:var(--primary); font-weight:500; font-size:0.8rem; text-transform:uppercase; letter-spacing:1px; margin-bottom:0.5rem;">By ${esc(p.company_name)}</p>
-              ${meta.length ? `<p class="meta-text" style="margin-bottom:1rem;">${meta.join(' &middot; ')}</p>` : ''}
-              <div class="actions" style="margin-top:auto; padding-top:1rem; border-top:1px solid #f0f0f0;">
-                <a href="#/browse/view/${p.project_id}" class="btn btn-elegant" style="flex: 1;">Explore Room</a>
-                <button class="btn btn-outline" data-s2="${p.project_id}" title="Save to Favourites" style="padding: 0.6rem;">⭐</button>
-              </div>
+        tb.innerHTML = `<div class="data-grid">` + r.projects.map(p => `
+          <div class="data-card" style="padding: 1.5rem;">
+            <div class="data-header">
+              <h3>${esc(p.title)}</h3>
+              <span class="badge ${p.status === 'Completed' ? 'badge-neutral' : 'badge-success'}">${esc(p.status)}</span>
             </div>
-          `;
-        }).join('') + `</div>`;
+            <p class="meta-text" style="color:var(--primary); font-weight:500; font-size:0.8rem; text-transform:uppercase; letter-spacing:1px; margin-bottom:1rem;">By ${esc(p.company_name)}</p>
+            <div class="actions" style="margin-top:auto; padding-top:1rem; border-top:1px solid #f0f0f0;">
+              <a href="#/browse/view/${p.project_id}" class="btn btn-elegant" style="flex: 1;">Explore Room</a>
+              <button class="btn btn-outline" data-s2="${p.project_id}" title="Save to Favourites" style="padding: 0.6rem;">⭐</button>
+            </div>
+          </div>
+        `).join('') + `</div>`;
       }
     } catch (ex) { notifyError(ex); }
   };
@@ -962,15 +933,10 @@ async function browseView(id) {
   try {
     const r = await api('/api/projects/public/' + id);
     const p = r.project;
-    const meta = [];
-    if (p.property_size)   meta.push('<strong>Property Size:</strong> ' + esc(p.property_size));
-    if (p.number_of_rooms) meta.push('<strong>Number of Rooms:</strong> ' + esc(p.number_of_rooms));
-
     shell(`
       ${pageHeader('Explore Room', esc(p.title))}
       <div style="max-width: 900px; margin: 0 auto; background: #fff; border-radius: 8px; border: 1px solid #f0f0f0; overflow:hidden;">
         <div style="padding: 3rem;">
-          ${meta.length ? `<p class="meta-text" style="font-size:1.1rem; margin-bottom:2rem;">${meta.join(' &middot; ')}</p>` : ''}
           <p class="meta-text" style="font-size:1.2rem; margin-bottom:2rem; line-height:1.8; color:#444;">${esc(p.description || 'No conceptual narrative provided by designer.')}</p>
           <div class="actions" style="justify-content:center;">
             <a href="#/browse" class="btn btn-outline">Back to Gallery</a>
@@ -1002,23 +968,17 @@ async function favouritesList() {
       const tb = $('#tb'); if (!tb) return;
       if (r.favourites.length === 0) { tb.innerHTML = '<p class="error">❌ You have not saved any projects yet.</p>'; }
       else {
-        tb.innerHTML = `<div class="data-grid">` + r.favourites.map(f => {
-          const meta = [];
-          if (f.property_size)   meta.push('📐 ' + esc(f.property_size));
-          if (f.number_of_rooms) meta.push('🚪 ' + esc(f.number_of_rooms) + ' rooms');
-          return `
-            <div class="data-card" style="padding: 1.5rem;">
-              <div class="data-header">
-                <h3>${esc(f.title)}</h3>
-              </div>
-              ${meta.length ? `<p class="meta-text" style="margin:0.5rem 0 1rem;">${meta.join(' &middot; ')}</p>` : ''}
-              <div class="actions" style="margin-top:1.5rem; padding-top:1rem; border-top:1px solid #f0f0f0;">
-                <a href="#/browse/view/${f.project_id}" class="btn btn-elegant" style="flex: 1;">View Again</a>
-                <button class="btn btn-danger" data-x="${f.project_id}" style="border:none;">Remove</button>
-              </div>
+        tb.innerHTML = `<div class="data-grid">` + r.favourites.map(f => `
+          <div class="data-card" style="padding: 1.5rem;">
+            <div class="data-header">
+              <h3>${esc(f.title)}</h3>
             </div>
-          `;
-        }).join('') + `</div>`;
+            <div class="actions" style="margin-top:1.5rem; padding-top:1rem; border-top:1px solid #f0f0f0;">
+              <a href="#/browse/view/${f.project_id}" class="btn btn-elegant" style="flex: 1;">View Again</a>
+              <button class="btn btn-danger" data-x="${f.project_id}" style="border:none;">Remove</button>
+            </div>
+          </div>
+        `).join('') + `</div>`;
       }
     } catch (ex) { notifyError(ex); }
   };
