@@ -54,7 +54,10 @@ $r->get   ('/projects/search',                     [$auth, $D],  fn() => SearchA
 $r->get   ('/projects/search/interest',            [$auth, $D],  fn() => SearchAllInterestController::search());
 
 $r->post  ('/projects/completed',                  [$auth, $D],  fn() => CreateCompletedProjController::create());
+
+// -------- US #21 / #26 / #27 — Dedicated single-resource routes --------
 $r->get   ('/projects/:id',                        [$auth, $D],  fn($p) => ViewProjectController::view($p));
+$r->get   ('/projects/:id/completed',              [$auth, $D],  fn($p) => ViewCompletedProjController::view($p));   // ← ADDED
 $r->put   ('/projects/:id',                        [$auth, $D],  fn($p) => UpdateProjectController::update($p));
 $r->put   ('/projects/:id/completed',              [$auth, $D],  fn($p) => UpdateCompletedProjController::update($p));
 $r->delete('/projects/:id',                        [$auth, $D],  fn($p) => DeleteProjectController::remove($p));
@@ -66,10 +69,10 @@ $r->get   ('/favourites/search',    [$auth, $Cu], fn() => FavouriteController::s
 $r->post  ('/favourites',           [$auth, $Cu], fn() => FavouriteController::add());
 $r->delete('/favourites/:projectId',[$auth, $Cu], fn($p) => FavouriteController::remove($p));
 
-// -------- US #41–#45 – Categories (Manager) --------
-$r->get   ('/categories',           [$auth], fn() => ViewCategoryController::list());
-$r->get   ('/categories/search',    [$auth], fn() => SearchCategoryController::search());
-$r->get   ('/categories/:id',       [$auth], fn($p) => ViewCategoryController::view($p));
+// -------- US #41–#45 – Categories (Platform Manager only — RBAC fix applied) --------
+$r->get   ('/categories',           [$auth, $M], fn() => ViewCategoryController::list());       // ← RBAC FIX
+$r->get   ('/categories/search',    [$auth, $M], fn() => SearchCategoryController::search());   // ← RBAC FIX
+$r->get   ('/categories/:id',       [$auth, $M], fn($p) => ViewCategoryController::view($p));   // ← RBAC FIX
 $r->post  ('/categories',           [$auth, $M], fn() => CreateCategoryController::create());
 $r->put   ('/categories/:id',       [$auth, $M], fn($p) => UpdateCategoryController::update($p));
 $r->delete('/categories/:id',       [$auth, $M], fn($p) => DeleteCategoryController::remove($p));

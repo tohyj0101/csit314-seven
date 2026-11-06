@@ -72,7 +72,7 @@ class AllTest extends TestCase
         $emails = ['idtest@example.test','custtest@example.test','admintest@example.test','pmtest@example.test',
                    'user+a@example.test','user+b@example.test','user+c@example.test','user+d@example.test'];
         foreach ($emails as $e) ex("DELETE FROM user_account WHERE email = $1", [$e]);
-        ex("DELETE FROM company WHERE company_name IN ('Test Studio','Test Studio v2','ToDel','ProjCo')");
+        ex("DELETE FROM company WHERE company_name IN ('Test Studio','Test Studio v2','ToDel','ProjCo', 'Test Studio 21', 'Test Studio 26', 'Test Studio 27')");
         ex("DELETE FROM category WHERE category_name LIKE 'TC%'");
 
         // 2. Ensure base profiles exist
@@ -114,7 +114,7 @@ class AllTest extends TestCase
                   'user+a@example.test','user+b@example.test','user+c@example.test','user+d@example.test'] as $e) {
             ex("DELETE FROM user_account WHERE email = $1", [$e]);
         }
-        ex("DELETE FROM company WHERE company_name IN ('Test Studio','Test Studio v2','ToDel','ProjCo')");
+        ex("DELETE FROM company WHERE company_name IN ('Test Studio','Test Studio v2','ToDel','ProjCo', 'Test Studio 21', 'Test Studio 26', 'Test Studio 27')");
         ex("DELETE FROM category WHERE category_name LIKE 'TC%'");
     }
 
@@ -445,6 +445,78 @@ class AllTest extends TestCase
 
         // #23 Delete Ongoing Project
         $this->assertSame(200, self::req('DELETE',"/api/projects/$oId",null,'d')['status']);
+    }
+
+    // =========================================================================
+    // US #21 – View New (Ongoing) Project — single resource
+    // =========================================================================
+    
+    public function test_21_view_new_project_by_id(): void
+    {
+        $cid = self::req('POST', '/api/companies', ['company_name' => 'Test Studio 21'], 'd')
+                       ['body']['company']['company_id'];
+        $pid = self::req('POST', '/api/projects', [
+            'company_id' => $cid, 'title' => 'View 21', 'description' => 'd', 'status' => 'Ongoing',
+        ], 'd')['body']['project']['project_id'];
+
+        // Success — 200 with the project body
+        $r = self::req('GET', "/api/projects/$pid", null, 'd');
+        $this->assertSame(200, $r['status']);
+        $this->assertSame('View 21', $r['body']['project']['title']);
+
+        // A1 — Not Found → 404
+        $this->assertSame(404, self::req('GET', '/api/projects/99999999', null, 'd')['status']);
+    }
+
+    // =========================================================================
+    // US #26 – View Completed Project — single resource
+    // =========================================================================
+    
+    public function test_26_view_completed_project_by_id(): void
+    {
+        $cid = self::req('POST', '/api/companies', ['company_name' => 'Test Studio 26'], 'd')
+                       ['body']['company']['company_id'];
+        $pid = self::req('POST', '/api/projects/completed', [
+            'company_id' => $cid, 'title' => 'View 26', 'description' => 'd',
+        ], 'd')['body']['project']['project_id'];
+
+        // Success — 200 via the dedicated completed endpoint
+        $r = self::req('GET', "/api/projects/$pid/completed", null, 'd');
+        $this->assertSame(200, $r['status']);
+        $this->assertSame('View 26', $r['body']['project']['title']);
+
+        // A1 — A project not actually Completed should 404 via this endpoint
+        $ongoingId = self::req('POST', '/api/projects', [
+            'company_id' => $cid, 'title' => 'Ongoing 26', 'description' => 'd', 'status' => 'Ongoing',
+        ], 'd')['body']['project']['project_id'];
+        $this->assertSame(404, self::req('GET', "/api/projects/$ongoingId/completed", null, 'd')['status']);
+    }
+
+    // =========================================================================
+    // US #27 – Update Completed Project
+    // =========================================================================
+    
+    public function test_27_update_completed_project(): void
+    {
+        $cid = self::req('POST', '/api/companies', ['company_name' => 'Test Studio 27'], 'd')
+                       ['body']['company']['company_id'];
+        $pid = self::req('POST', '/api/projects/completed', [
+            'company_id' => $cid, 'title' => 'Old 27', 'description' => 'd',
+        ], 'd')['body']['project']['project_id'];
+
+        // Success — 200 with updated title
+        $r = self::req('PUT', "/api/projects/$pid/completed",
+            ['title' => 'New 27', 'description' => 'd'], 'd');
+        $this->assertSame(200, $r['status']);
+        $this->assertSame('New 27', $r['body']['project']['title']);
+
+        // A1 — Missing fields → 400
+        $this->assertSame(400, self::req('PUT', "/api/projects/$pid/completed",
+            ['title' => '', 'description' => ''], 'd')['status']);
+
+        // A2 — Unauthorized (Customer trying to update) → 403
+        $this->assertSame(403, self::req('PUT', "/api/projects/$pid/completed",
+            ['title' => 'Hijack', 'description' => 'd'], 'c')['status']);
     }
 
     // =========================================================================
