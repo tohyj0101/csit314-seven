@@ -30,7 +30,7 @@ async function api(u, o = {}) {
 
       const err = new Error(msg);
       err.status = r.status;
-      if (b && b.display) err.displayData = b; 
+      if (b && b.display) err.displayData = b;
       throw err;
     }
     return b || {};
@@ -547,7 +547,7 @@ async function profilesEdit(id) {
 // =============================================================================
 async function companiesList() {
   checkFlash();
-  shell(`${pageHeader('Company Directory', 'Manage your associated business entities before attaching projects.')} <div class="actions" style="justify-content: center; margin-bottom: 2rem;"> <a href="#/companies/create" class="btn btn-elegant">+ Create Company</a> </div> <div class="search-bar"> <input id="q" placeholder="Search by company name..." style="flex:1;" /> <button class="btn btn-elegant" id="s">Search</button> <button class="btn btn-outline" id="r">Reset</button> </div> <div id="tb"></div>`);
+  shell(`${pageHeader('Company Directory', 'Manage your associated business entities before attaching projects.')} <div class="actions" style="justify-content: center; margin-bottom: 2rem;"> <a href="#/companies/create" class="btn btn-elegant">+ Create Company</a> </div> <div class="search-bar"> <input id="q" placeholder="Search by company name, contact person, or address..." style="flex:1;" /> <button class="btn btn-elegant" id="s">Search</button> <button class="btn btn-outline" id="r">Reset</button> </div> <div id="tb"></div>`);
 
   const reload = async q => {
     try {
@@ -558,6 +558,7 @@ async function companiesList() {
         tb.innerHTML = `<div class="data-grid">` + L.map(c => `
           <div class="data-card" style="padding: 1.5rem;">
             <h3 style="margin-bottom:1rem; font-size: 1.5rem; border-bottom: 1px solid #eee; padding-bottom:1rem;">${esc(c.company_name)}</h3>
+            ${c.contact_person ? `<p class="meta-text" style="display:flex; align-items:center; gap:8px;"><strong>👤</strong> <span>${esc(c.contact_person)}</span></p>` : ''}
             <p class="meta-text" style="display:flex; align-items:flex-start; gap:8px;"><strong>📍</strong> <span>${esc(c.address || 'Address Unlisted')}</span></p>
             <p class="meta-text" style="display:flex; align-items:center; gap:8px;"><strong>📞</strong> <span>${esc(c.contact_no || 'No Contact')}</span></p>
             <div class="actions" style="margin-top:auto; padding-top:1rem;">
@@ -577,7 +578,7 @@ async function companiesList() {
 
   $('#tb').onclick = async e => {
     const di = e.target.getAttribute('data-d');
-    if (di && confirm('Delete Company #' + di + ' permanently?')) {
+    if (di && confirm('Delete Company #' + di + ' permanently?\n\nNote: companies with linked projects cannot be deleted — you must delete their projects first.')) {
       try {
         await api('/api/companies/' + di, { method: 'DELETE' });
         showToast('Company Information deleted successfully!');
@@ -592,6 +593,7 @@ async function companiesCreate() {
   shell(`${pageHeader('Create Company Information', 'Enter your corporate details to associate future interior design projects.')}
     <form id="f" style="max-width: 600px; margin: 0 auto;">
       <div class="form-group"><label>Registered Business Name</label><input name="company_name" placeholder="e.g., My Design Studio" required/></div>
+      <div class="form-group"><label>Contact Person</label><input name="contact_person" placeholder="e.g., Alice Tan"/></div>
       <div class="form-group"><label>Address</label><input name="address" placeholder="e.g., 123 Orchard Road" /></div>
       <div class="form-group">
         <label>Contact Hotline (8 Digits)</label>
@@ -607,12 +609,10 @@ async function companiesCreate() {
   $('#f').onsubmit = async e => {
     e.preventDefault();
     const b = Object.fromEntries(new FormData(e.target));
-
     if (b.contact_no && !/^\d{8}$/.test(b.contact_no)) {
       showMsgError('m', Object.assign(new Error('Contact Hotline must be exactly 8 digits.'), { status: 400 }));
       return;
     }
-
     showMsg('m', 'Saving...', false);
     try {
       await api('/api/companies', { method: 'POST', body: JSON.stringify(b) });
@@ -630,6 +630,7 @@ async function companiesView(id) {
       <div style="max-width: 600px; margin: 0 auto; background: #fff; padding: 2rem; border-radius: 8px; border: 1px solid #f0f0f0;">
         <p class="meta-text" style="font-size:1.1rem; margin-bottom:1rem;"><strong>Company Name:</strong> ${esc(r.company.company_name)}</p>
         <p class="meta-text" style="font-size:1.1rem; margin-bottom:1rem;"><strong>Registry ID:</strong> #${r.company.company_id}</p>
+        ${r.company.contact_person ? `<p class="meta-text" style="font-size:1.1rem; margin-bottom:1rem;"><strong>Contact Person:</strong> ${esc(r.company.contact_person)}</p>` : ''}
         <p class="meta-text" style="font-size:1.1rem; margin-bottom:1rem;"><strong>Address:</strong> ${esc(r.company.address || 'Unlisted')}</p>
         <p class="meta-text" style="font-size:1.1rem; margin-bottom:1rem;"><strong>Contact:</strong> ${esc(r.company.contact_no || 'Unlisted')}</p>
         <div class="actions" style="margin-top: 2rem; justify-content:center;">
@@ -646,10 +647,11 @@ async function companiesEdit(id) {
     shell(`${pageHeader('Update Company Information', 'Updating details for ' + esc(r.company.company_name))}
       <form id="f" style="max-width: 600px; margin: 0 auto;">
         <div class="form-group"><label>Company name</label><input name="company_name" value="${esc(r.company.company_name)}" required/></div>
+        <div class="form-group"><label>Contact Person</label><input name="contact_person" value="${esc(r.company.contact_person || '')}"/></div>
         <div class="form-group"><label>Address</label><input name="address" value="${esc(r.company.address || '')}"/></div>
         <div class="form-group">
           <label>Contact Hotline (8 Digits)</label>
-          <input name="contact_no" type="tel" pattern="\\d{8}" maxlength="8" value="${esc(r.company.contact_no || '')}" placeholder="e.g., 91234567" title="Please enter exactly 8 digits"/>
+          <input name="contact_no" type="tel" pattern="\\d{8}" maxlength="8" value="${esc(r.company.contact_no || '')}" placeholder="e.g., 91234567"/>
         </div>
         <p id="m" class="error"></p>
         <div class="actions" style="justify-content: center; margin-top: 2rem;">
@@ -661,12 +663,10 @@ async function companiesEdit(id) {
     $('#f').onsubmit = async e => {
       e.preventDefault();
       const b = Object.fromEntries(new FormData(e.target));
-
       if (b.contact_no && !/^\d{8}$/.test(b.contact_no)) {
         showMsgError('m', Object.assign(new Error('Contact Hotline must be exactly 8 digits.'), { status: 400 }));
         return;
       }
-
       showMsg('m', 'Saving...', false);
       try {
         await api('/api/companies/' + id, { method: 'PUT', body: JSON.stringify(b) });
@@ -726,6 +726,9 @@ async function projectsList() {
       else {
         tb.innerHTML = `<div class="data-grid">` + L.map(p => {
           const i = im[p.project_id] || { views: 0, shortlists: 0 };
+          const meta = [];
+          if (p.property_size)   meta.push('📐 ' + esc(p.property_size));
+          if (p.number_of_rooms) meta.push('🚪 ' + esc(p.number_of_rooms) + ' rooms');
           return `
             <div class="data-card">
               <div class="data-info">
@@ -733,7 +736,8 @@ async function projectsList() {
                   <h3>${esc(p.title)}</h3>
                   <span class="badge ${p.status === 'Completed' ? 'badge-neutral' : 'badge-success'}">${esc(p.status)}</span>
                 </div>
-                ${p.company_name ? `<p class="meta-text" style="color:var(--primary); font-size:0.75rem; text-transform:uppercase; letter-spacing:1px; margin: 0.25rem 0 0.75rem;">${esc(p.company_name)}</p>` : ''}
+                ${p.company_name ? `<p class="meta-text" style="color:var(--primary); font-size:0.75rem; text-transform:uppercase; letter-spacing:1px; margin: 0.25rem 0 0.5rem;">${esc(p.company_name)}</p>` : ''}
+                ${meta.length ? `<p class="meta-text" style="margin-bottom:0.75rem;">${meta.join(' &middot; ')}</p>` : ''}
                 <div class="metrics-row">
                   <div class="metric-item">👁️ ${i.views} Views</div>
                   <div class="metric-item">⭐ ${i.shortlists} Saves</div>
@@ -741,7 +745,7 @@ async function projectsList() {
                 <div class="actions" style="margin-top:auto;">
                   <a href="#/projects/view/${p.project_id}" class="btn btn-outline" style="flex:1">View</a>
                   <a href="#/projects/edit/${p.project_id}" class="btn btn-outline" style="flex:1">Update</a>
-                  <button class="btn btn-danger" data-d="${p.project_id}" style="border:none;">Delete</button>
+                  <button class="btn btn-danger" data-d="${p.project_id}" data-st="${p.status}" style="border:none;">Delete</button>
                 </div>
               </div>
             </div>
@@ -756,14 +760,17 @@ async function projectsList() {
   $('#r').onclick = () => { $('#q').value = ''; $('#st').value = ''; reload(''); };
 
   $('#tb').onclick = async e => {
-    const di = e.target.getAttribute('data-d');
-    if (di && confirm('Delete Project #' + di + ' permanently?')) {
-      try {
-        await api('/api/projects/' + di, { method: 'DELETE' });
-        showToast('Project deleted successfully!');
-        reload($('#q').value);
-      } catch (ex) { notifyError(ex); }
-    }
+    const btn = e.target.closest('[data-d]');
+    if (!btn) return;
+    const di = btn.getAttribute('data-d');
+    const st = btn.getAttribute('data-st');
+    if (!confirm('Delete Project #' + di + ' permanently?')) return;
+    try {
+      const url = '/api/projects/' + di + (st === 'Completed' ? '/completed' : '');
+      await api(url, { method: 'DELETE' });
+      showToast('Project deleted successfully!');
+      reload($('#q').value);
+    } catch (ex) { notifyError(ex); }
   };
   await reload('');
 }
@@ -776,26 +783,20 @@ async function projectsCreate() {
 
   shell(`${pageHeader('Create New Project', 'Add a new showcase to your portfolio.')}
     <form id="f" style="max-width: 600px; margin: 0 auto;">
-
       <div class="form-group">
         <label>Company</label>
         <select name="company_id">
           ${CS.map(c => `<option value="${c.company_id}" ${c.company_id == activeId ? 'selected' : ''}>${esc(c.company_name)}</option>`).join('')}
         </select>
       </div>
-
       <div class="form-group"><label>Project Title</label><input name="title" placeholder="e.g., Modern BTO Renovation" required/></div>
-
       <div class="form-group"><label>Description</label><textarea name="description" rows="4" placeholder="Provide a brief overview of the design concept..." required></textarea></div>
-
+      <div class="form-group"><label>Property Size</label><input name="property_size" placeholder="e.g., 4-room, 120 sqm, 3-bedroom"/></div>
+      <div class="form-group"><label>Number of Rooms</label><input name="number_of_rooms" type="number" min="1" step="1" placeholder="e.g., 4"/></div>
       <div class="form-group">
         <label>Phase Status</label>
-        <select name="status">
-          <option value="Ongoing">Ongoing</option>
-          <option value="Completed">Completed</option>
-        </select>
+        <select name="status"><option value="Ongoing">Ongoing</option><option value="Completed">Completed</option></select>
       </div>
-
       <p id="m" class="error"></p>
       <div class="actions" style="justify-content: center; margin-top: 2rem;">
         <button type="submit" class="btn btn-elegant">Create New Project</button>
@@ -807,9 +808,13 @@ async function projectsCreate() {
     e.preventDefault();
     const b = Object.fromEntries(new FormData(e.target));
     b.company_id = +b.company_id;
+    if (b.number_of_rooms === '' || b.number_of_rooms == null) delete b.number_of_rooms;
+    else b.number_of_rooms = +b.number_of_rooms;
+    if (!b.property_size) delete b.property_size;
     showMsg('m', 'Saving...', false);
     try {
-      await api('/api/projects', { method: 'POST', body: JSON.stringify(b) });
+      const endpoint = (b.status === 'Completed') ? '/api/projects/completed' : '/api/projects';
+      await api(endpoint, { method: 'POST', body: JSON.stringify(b) });
       flash('Project created successfully!');
       window.location.hash = '#/projects';
     } catch (ex) { showMsgError('m', ex); }
@@ -819,22 +824,55 @@ async function projectsCreate() {
 async function projectsView(id) {
   try {
     const r = await api('/api/projects/' + id);
-    shell(`${pageHeader('View Interior Design Project', esc(r.project.title))} <div style="max-width: 800px; margin: 0 auto; background: #fff; border-radius: 8px; border: 1px solid #f0f0f0; overflow:hidden;"> <div style="padding: 2rem;"> <p class="meta-text" style="font-size:1.1rem; margin-bottom:1rem;"><span class="badge ${r.project.status === 'Completed' ? 'badge-neutral' : 'badge-success'}">${esc(r.project.status)}</span></p> <p class="meta-text" style="font-size:1.1rem; margin-bottom:1rem; white-space:pre-line;">${esc(r.project.description || 'No description provided.')}</p> <div class="actions" style="margin-top: 2rem; justify-content:center;"> <a href="#/projects" class="btn btn-outline">Return to Portfolio</a> </div> </div> </div>`);
+    const p = r.project;
+    const meta = [];
+    if (p.property_size)   meta.push('<strong>Property Size:</strong> ' + esc(p.property_size));
+    if (p.number_of_rooms) meta.push('<strong>Rooms:</strong> ' + esc(p.number_of_rooms));
+
+    shell(`
+      ${pageHeader('View Interior Design Project', esc(p.title))}
+      <div style="max-width: 800px; margin: 0 auto; background: #fff; border-radius: 8px; border: 1px solid #f0f0f0; overflow:hidden;">
+        <div style="padding: 2rem;">
+          <p class="meta-text" style="font-size:1.1rem; margin-bottom:1rem;">
+            <span class="badge ${p.status === 'Completed' ? 'badge-neutral' : 'badge-success'}">${esc(p.status)}</span>
+          </p>
+          ${meta.length ? `<p class="meta-text" style="font-size:1.05rem; margin-bottom:1.5rem;">${meta.join(' &middot; ')}</p>` : ''}
+          <p class="meta-text" style="font-size:1.1rem; margin-bottom:1rem; white-space:pre-line;">${esc(p.description || 'No description provided.')}</p>
+          <div class="actions" style="margin-top: 2rem; justify-content:center;">
+            <a href="#/projects" class="btn btn-outline">Return to Portfolio</a>
+          </div>
+        </div>
+      </div>
+    `);
   } catch (ex) { shell(errorHtml(ex)); }
 }
 
 async function projectsEdit(id) {
   try {
-    const r = await api('/api/projects/' + id);
-    shell(`${pageHeader('Update Project Details', 'Updating parameters for ' + esc(r.project.title))}
+    const r  = await api('/api/projects/' + id);
+    const CS = (await api('/api/companies')).companies;
+    const p  = r.project;
+    const putEndpoint = (p.status === 'Completed')
+      ? '/api/projects/' + id + '/completed'
+      : '/api/projects/' + id;
+
+    shell(`${pageHeader('Update Project Details', 'Updating parameters for ' + esc(p.title))}
       <form id="f" style="max-width: 600px; margin: 0 auto;">
-        <div class="form-group"><label>Project Title</label><input name="title" value="${esc(r.project.title)}" required/></div>
-        <div class="form-group"><label>Description</label><textarea name="description" rows="4" required>${esc(r.project.description || '')}</textarea></div>
+        <div class="form-group">
+          <label>Company</label>
+          <select name="company_id">
+            ${CS.map(c => `<option value="${c.company_id}" ${c.company_id === p.company_id ? 'selected' : ''}>${esc(c.company_name)}</option>`).join('')}
+          </select>
+        </div>
+        <div class="form-group"><label>Project Title</label><input name="title" value="${esc(p.title)}" required/></div>
+        <div class="form-group"><label>Description</label><textarea name="description" rows="4" required>${esc(p.description || '')}</textarea></div>
+        <div class="form-group"><label>Property Size</label><input name="property_size" value="${esc(p.property_size || '')}" placeholder="e.g., 4-room, 120 sqm"/></div>
+        <div class="form-group"><label>Number of Rooms</label><input name="number_of_rooms" type="number" min="1" step="1" value="${esc(p.number_of_rooms || '')}" placeholder="e.g., 4"/></div>
         <div class="form-group">
           <label>Phase Status</label>
           <select name="status">
-            <option value="Ongoing" ${r.project.status === 'Ongoing' ? 'selected' : ''}>Ongoing</option>
-            <option value="Completed" ${r.project.status === 'Completed' ? 'selected' : ''}>Completed</option>
+            <option value="Ongoing" ${p.status === 'Ongoing' ? 'selected' : ''}>Ongoing</option>
+            <option value="Completed" ${p.status === 'Completed' ? 'selected' : ''}>Completed</option>
           </select>
         </div>
         <p id="m" class="error"></p>
@@ -847,9 +885,13 @@ async function projectsEdit(id) {
     $('#f').onsubmit = async e => {
       e.preventDefault();
       const b = Object.fromEntries(new FormData(e.target));
+      b.company_id = +b.company_id;
+      if (b.number_of_rooms === '' || b.number_of_rooms == null) delete b.number_of_rooms;
+      else b.number_of_rooms = +b.number_of_rooms;
+      if (!b.property_size) delete b.property_size;
       showMsg('m', 'Saving...', false);
       try {
-        await api('/api/projects/' + id, { method: 'PUT', body: JSON.stringify(b) });
+        await api(putEndpoint, { method: 'PUT', body: JSON.stringify(b) });
         flash('Project updated successfully!');
         window.location.hash = '#/projects';
       } catch (ex) { showMsgError('m', ex); }
@@ -864,7 +906,7 @@ async function browseList() {
   shell(`
     ${pageHeader('Discovery Gallery', 'Discover visually striking interior design projects and save your inspirations.')}
     <div class="search-bar">
-      <input id="q" placeholder="Search by project title or designer..." style="flex:1;" />
+      <input id="q" placeholder="Search by title, description, property size, or number of rooms..." style="flex:1;" />
       <button class="btn btn-elegant" id="s">Search</button>
       <button class="btn btn-outline" id="r">Reset</button>
     </div>
@@ -877,19 +919,25 @@ async function browseList() {
       const tb = $('#tb'); if (!tb) return;
       if (r.projects.length === 0) { tb.innerHTML = '<p class="error">❌ No projects discovered matching criteria.</p>'; }
       else {
-        tb.innerHTML = `<div class="data-grid">` + r.projects.map(p => `
-          <div class="data-card" style="padding: 1.5rem;">
-            <div class="data-header">
-              <h3>${esc(p.title)}</h3>
-              <span class="badge ${p.status === 'Completed' ? 'badge-neutral' : 'badge-success'}">${esc(p.status)}</span>
+        tb.innerHTML = `<div class="data-grid">` + r.projects.map(p => {
+          const meta = [];
+          if (p.property_size)   meta.push('📐 ' + esc(p.property_size));
+          if (p.number_of_rooms) meta.push('🚪 ' + esc(p.number_of_rooms) + ' rooms');
+          return `
+            <div class="data-card" style="padding: 1.5rem;">
+              <div class="data-header">
+                <h3>${esc(p.title)}</h3>
+                <span class="badge ${p.status === 'Completed' ? 'badge-neutral' : 'badge-success'}">${esc(p.status)}</span>
+              </div>
+              <p class="meta-text" style="color:var(--primary); font-weight:500; font-size:0.8rem; text-transform:uppercase; letter-spacing:1px; margin-bottom:0.5rem;">By ${esc(p.company_name)}</p>
+              ${meta.length ? `<p class="meta-text" style="margin-bottom:1rem;">${meta.join(' &middot; ')}</p>` : ''}
+              <div class="actions" style="margin-top:auto; padding-top:1rem; border-top:1px solid #f0f0f0;">
+                <a href="#/browse/view/${p.project_id}" class="btn btn-elegant" style="flex: 1;">Explore Room</a>
+                <button class="btn btn-outline" data-s2="${p.project_id}" title="Save to Favourites" style="padding: 0.6rem;">⭐</button>
+              </div>
             </div>
-            <p class="meta-text" style="color:var(--primary); font-weight:500; font-size:0.8rem; text-transform:uppercase; letter-spacing:1px; margin-bottom:1rem;">By ${esc(p.company_name)}</p>
-            <div class="actions" style="margin-top:auto; padding-top:1rem; border-top:1px solid #f0f0f0;">
-              <a href="#/browse/view/${p.project_id}" class="btn btn-elegant" style="flex: 1;">Explore Room</a>
-              <button class="btn btn-outline" data-s2="${p.project_id}" title="Save to Favourites" style="padding: 0.6rem;">⭐</button>
-            </div>
-          </div>
-        `).join('') + `</div>`;
+          `;
+        }).join('') + `</div>`;
       }
     } catch (ex) { notifyError(ex); }
   };
@@ -913,7 +961,23 @@ async function browseList() {
 async function browseView(id) {
   try {
     const r = await api('/api/projects/public/' + id);
-    shell(`${pageHeader('Explore Room', esc(r.project.title))} <div style="max-width: 900px; margin: 0 auto; background: #fff; border-radius: 8px; border: 1px solid #f0f0f0; overflow:hidden;"> <div style="padding: 3rem;"> <p class="meta-text" style="font-size:1.2rem; margin-bottom:2rem; line-height:1.8; color:#444;">${esc(r.project.description || 'No conceptual narrative provided by designer.')}</p> <div class="actions" style="justify-content:center;"> <a href="#/browse" class="btn btn-outline">Back to Gallery</a> </div> </div> </div>`);
+    const p = r.project;
+    const meta = [];
+    if (p.property_size)   meta.push('<strong>Property Size:</strong> ' + esc(p.property_size));
+    if (p.number_of_rooms) meta.push('<strong>Number of Rooms:</strong> ' + esc(p.number_of_rooms));
+
+    shell(`
+      ${pageHeader('Explore Room', esc(p.title))}
+      <div style="max-width: 900px; margin: 0 auto; background: #fff; border-radius: 8px; border: 1px solid #f0f0f0; overflow:hidden;">
+        <div style="padding: 3rem;">
+          ${meta.length ? `<p class="meta-text" style="font-size:1.1rem; margin-bottom:2rem;">${meta.join(' &middot; ')}</p>` : ''}
+          <p class="meta-text" style="font-size:1.2rem; margin-bottom:2rem; line-height:1.8; color:#444;">${esc(p.description || 'No conceptual narrative provided by designer.')}</p>
+          <div class="actions" style="justify-content:center;">
+            <a href="#/browse" class="btn btn-outline">Back to Gallery</a>
+          </div>
+        </div>
+      </div>
+    `);
   } catch (ex) { shell(errorHtml(ex)); }
 }
 
@@ -938,17 +1002,23 @@ async function favouritesList() {
       const tb = $('#tb'); if (!tb) return;
       if (r.favourites.length === 0) { tb.innerHTML = '<p class="error">❌ You have not saved any projects yet.</p>'; }
       else {
-        tb.innerHTML = `<div class="data-grid">` + r.favourites.map(f => `
-          <div class="data-card" style="padding: 1.5rem;">
-            <div class="data-header">
-              <h3>${esc(f.title)}</h3>
+        tb.innerHTML = `<div class="data-grid">` + r.favourites.map(f => {
+          const meta = [];
+          if (f.property_size)   meta.push('📐 ' + esc(f.property_size));
+          if (f.number_of_rooms) meta.push('🚪 ' + esc(f.number_of_rooms) + ' rooms');
+          return `
+            <div class="data-card" style="padding: 1.5rem;">
+              <div class="data-header">
+                <h3>${esc(f.title)}</h3>
+              </div>
+              ${meta.length ? `<p class="meta-text" style="margin:0.5rem 0 1rem;">${meta.join(' &middot; ')}</p>` : ''}
+              <div class="actions" style="margin-top:1.5rem; padding-top:1rem; border-top:1px solid #f0f0f0;">
+                <a href="#/browse/view/${f.project_id}" class="btn btn-elegant" style="flex: 1;">View Again</a>
+                <button class="btn btn-danger" data-x="${f.project_id}" style="border:none;">Remove</button>
+              </div>
             </div>
-            <div class="actions" style="margin-top:1.5rem; padding-top:1rem; border-top:1px solid #f0f0f0;">
-              <a href="#/browse/view/${f.project_id}" class="btn btn-elegant" style="flex: 1;">View Again</a>
-              <button class="btn btn-danger" data-x="${f.project_id}" style="border:none;">Remove</button>
-            </div>
-          </div>
-        `).join('') + `</div>`;
+          `;
+        }).join('') + `</div>`;
       }
     } catch (ex) { notifyError(ex); }
   };

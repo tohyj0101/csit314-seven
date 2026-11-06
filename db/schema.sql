@@ -1,69 +1,72 @@
 DROP TABLE IF EXISTS favourite, project_view, project_category, category, project, company, user_account, user_profile CASCADE;
 
 CREATE TABLE user_profile (
-  profile_id SERIAL PRIMARY KEY, 
-  profile_name VARCHAR(50) UNIQUE NOT NULL, 
-  description TEXT, 
+  profile_id SERIAL PRIMARY KEY,
+  profile_name VARCHAR(50) UNIQUE NOT NULL,
+  description TEXT,
   permissions TEXT[] NOT NULL DEFAULT '{}',
   status VARCHAR(20) NOT NULL DEFAULT 'Active' CHECK (status IN ('Active','Suspended'))
 );
 
 CREATE TABLE user_account (
-  account_id SERIAL PRIMARY KEY, 
-  profile_id INT NOT NULL REFERENCES user_profile(profile_id), 
-  username VARCHAR(100) UNIQUE NOT NULL, 
-  email VARCHAR(255) UNIQUE NOT NULL, 
-  password_hash VARCHAR(255) NOT NULL, 
-  status VARCHAR(20) NOT NULL DEFAULT 'Active' CHECK (status IN ('Active','Suspended')), 
-  created_at TIMESTAMPTZ NOT NULL DEFAULT now(), 
+  account_id SERIAL PRIMARY KEY,
+  profile_id INT NOT NULL REFERENCES user_profile(profile_id),
+  username VARCHAR(100) UNIQUE NOT NULL,
+  email VARCHAR(255) UNIQUE NOT NULL,
+  password_hash VARCHAR(255) NOT NULL,
+  status VARCHAR(20) NOT NULL DEFAULT 'Active' CHECK (status IN ('Active','Suspended')),
+  created_at TIMESTAMPTZ NOT NULL DEFAULT now(),
   updated_at TIMESTAMPTZ NOT NULL DEFAULT now()
 );
 
 CREATE TABLE company (
-  company_id SERIAL PRIMARY KEY, 
-  owner_id INT NOT NULL REFERENCES user_account(account_id) ON DELETE CASCADE, 
-  company_name VARCHAR(200) NOT NULL, 
-  address TEXT, 
-  contact_no VARCHAR(50), 
-  created_at TIMESTAMPTZ NOT NULL DEFAULT now(), 
+  company_id SERIAL PRIMARY KEY,
+  owner_id INT NOT NULL REFERENCES user_account(account_id) ON DELETE CASCADE,
+  company_name VARCHAR(200) NOT NULL,
+  contact_person VARCHAR(100),
+  address TEXT,
+  contact_no VARCHAR(50),
+  created_at TIMESTAMPTZ NOT NULL DEFAULT now(),
   updated_at TIMESTAMPTZ NOT NULL DEFAULT now()
 );
 
 CREATE TABLE category (
-  category_id SERIAL PRIMARY KEY, 
-  category_name VARCHAR(100) UNIQUE NOT NULL, 
-  description TEXT, 
+  category_id SERIAL PRIMARY KEY,
+  category_name VARCHAR(100) UNIQUE NOT NULL,
+  description TEXT,
   created_at TIMESTAMPTZ NOT NULL DEFAULT now()
 );
 
 CREATE TABLE project (
-  project_id SERIAL PRIMARY KEY, 
-  company_id INT NOT NULL REFERENCES company(company_id) ON DELETE CASCADE, 
-  title VARCHAR(200) NOT NULL, 
-  description TEXT NOT NULL, 
-  status VARCHAR(20) NOT NULL DEFAULT 'Ongoing' CHECK (status IN ('Ongoing','Completed')), 
-  date DATE, 
-  created_at TIMESTAMPTZ NOT NULL DEFAULT now(), 
+  project_id SERIAL PRIMARY KEY,
+  company_id INT NOT NULL REFERENCES company(company_id) ON DELETE RESTRICT,
+  title VARCHAR(200) NOT NULL,
+  description TEXT NOT NULL,
+  status VARCHAR(20) NOT NULL DEFAULT 'Ongoing' CHECK (status IN ('Ongoing','Completed')),
+  property_size VARCHAR(100),
+  number_of_rooms INT,
+  date DATE,
+  created_at TIMESTAMPTZ NOT NULL DEFAULT now(),
   updated_at TIMESTAMPTZ NOT NULL DEFAULT now()
 );
 
 CREATE TABLE project_category (
-  project_id INT NOT NULL REFERENCES project(project_id) ON DELETE CASCADE, 
-  category_id INT NOT NULL REFERENCES category(category_id) ON DELETE CASCADE, 
+  project_id INT NOT NULL REFERENCES project(project_id) ON DELETE CASCADE,
+  category_id INT NOT NULL REFERENCES category(category_id) ON DELETE CASCADE,
   PRIMARY KEY (project_id, category_id)
 );
 
 CREATE TABLE project_view (
-  view_id SERIAL PRIMARY KEY, 
-  project_id INT NOT NULL REFERENCES project(project_id) ON DELETE CASCADE, 
-  customer_id INT REFERENCES user_account(account_id) ON DELETE SET NULL, 
+  view_id SERIAL PRIMARY KEY,
+  project_id INT NOT NULL REFERENCES project(project_id) ON DELETE CASCADE,
+  customer_id INT REFERENCES user_account(account_id) ON DELETE SET NULL,
   viewed_at TIMESTAMPTZ NOT NULL DEFAULT now()
 );
 
 CREATE TABLE favourite (
-  favourite_id SERIAL PRIMARY KEY, 
-  customer_id INT NOT NULL REFERENCES user_account(account_id) ON DELETE CASCADE, 
-  project_id INT NOT NULL REFERENCES project(project_id) ON DELETE CASCADE, 
-  saved_at TIMESTAMPTZ NOT NULL DEFAULT now(), 
+  favourite_id SERIAL PRIMARY KEY,
+  customer_id INT NOT NULL REFERENCES user_account(account_id) ON DELETE CASCADE,
+  project_id INT NOT NULL REFERENCES project(project_id) ON DELETE CASCADE,
+  saved_at TIMESTAMPTZ NOT NULL DEFAULT now(),
   UNIQUE(customer_id, project_id)
 );

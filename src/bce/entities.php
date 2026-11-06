@@ -138,72 +138,172 @@ class CompanyInfo
     public static function saveCompany(array $f): array
     {
         return q1(
-            'INSERT INTO company (owner_id, company_name, address, contact_no) VALUES ($1,$2,$3,$4) RETURNING *',
-            [$f['owner_id'], $f['company_name'], $f['address'] ?? null, $f['contact_no'] ?? null]
+            'INSERT INTO company (owner_id, company_name, contact_person, address, contact_no)
+             VALUES ($1,$2,$3,$4,$5) RETURNING *',
+            [
+                $f['owner_id'],
+                $f['company_name'],
+                $f['contact_person'] ?? null,
+                $f['address'] ?? null,
+                $f['contact_no'] ?? null,
+            ]
         );
     }
-    public static function byOwner($id): array { return q('SELECT * FROM company WHERE owner_id=$1 ORDER BY company_id DESC', [$id]); }
-    public static function findById($id): ?array { return q1('SELECT * FROM company WHERE company_id=$1', [$id]); }
-    public static function updateCompanyInfo($id, array $f): ?array {
-        return q1('UPDATE company SET company_name=$2, address=$3, contact_no=$4, updated_at=now() WHERE company_id=$1 RETURNING *', [$id, $f['company_name'], $f['address'] ?? null, $f['contact_no'] ?? null]);
+
+    public static function byOwner($id): array
+    {
+        return q('SELECT * FROM company WHERE owner_id=$1 ORDER BY company_id DESC', [$id]);
     }
-    public static function removeCompany($id): void { ex('DELETE FROM company WHERE company_id=$1', [$id]); }
-    public static function findCompanies($oid, string $t): array {
-        return q('SELECT * FROM company WHERE owner_id=$1 AND (company_name ILIKE $2 OR address ILIKE $2) ORDER BY company_id LIMIT 100', [$oid, '%' . $t . '%']);
+
+    public static function findById($id): ?array
+    {
+        return q1('SELECT * FROM company WHERE company_id=$1', [$id]);
+    }
+
+    public static function updateCompanyInfo($id, array $f): ?array
+    {
+        return q1(
+            'UPDATE company
+                SET company_name   = $2,
+                    contact_person = $3,
+                    address        = $4,
+                    contact_no     = $5,
+                    updated_at     = now()
+              WHERE company_id = $1 RETURNING *',
+            [
+                $id,
+                $f['company_name'],
+                $f['contact_person'] ?? null,
+                $f['address'] ?? null,
+                $f['contact_no'] ?? null,
+            ]
+        );
+    }
+
+    public static function removeCompany($id): void
+    {
+        ex('DELETE FROM company WHERE company_id=$1', [$id]);
+    }
+
+    public static function findCompanies($oid, string $t): array
+    {
+        return q(
+            'SELECT * FROM company
+              WHERE owner_id=$1
+                AND (company_name ILIKE $2 OR address ILIKE $2 OR contact_person ILIKE $2)
+              ORDER BY company_id LIMIT 100',
+            [$oid, '%' . $t . '%']
+        );
     }
 }
 
 class Project
 {
-    public static function saveProject(array $f): array {
-        return q1('INSERT INTO project (company_id, title, description, status) VALUES ($1,$2,$3,$4) RETURNING *', [$f['company_id'], $f['title'], $f['description'], $f['status']]);
-    }
-    
-    public static function findById($id): ?array { return q1('SELECT * FROM project WHERE project_id=$1', [$id]); }
-    
-    public static function byCompany($cid, $s = null): array {
-        return q('SELECT * FROM project WHERE company_id=$1 AND ($2::text IS NULL OR status=$2) ORDER BY project_id DESC', [$cid, $s]);
-    }
-    
-    // [ITEM 6 / ITEM 16] company_id is no longer part of the update payload
-    public static function updateProject($id, array $f): ?array {
+    public static function saveProject(array $f): array
+    {
         return q1(
-            'UPDATE project 
-             SET title = COALESCE($2, title), 
-                 description = COALESCE($3, description), 
-                 status = COALESCE($4, status), 
-                 updated_at = now() 
-             WHERE project_id = $1 RETURNING *', 
+            'INSERT INTO project (company_id, title, description, status, property_size, number_of_rooms)
+             VALUES ($1,$2,$3,$4,$5,$6) RETURNING *',
             [
-                $id, 
-                $f['title'] ?? null, 
-                $f['description'] ?? null, 
-                $f['status'] ?? null
+                $f['company_id'],
+                $f['title'],
+                $f['description'],
+                $f['status'],
+                $f['property_size'] ?? null,
+                $f['number_of_rooms'] ?? null,
             ]
         );
     }
-    
-    public static function deleteProject($id): void { ex('DELETE FROM project WHERE project_id=$1', [$id]); }
-    
-    public static function searchProject($cid, string $t, $s = null): array {
-        return q('SELECT * FROM project WHERE company_id=$1 AND ($3::text IS NULL OR status=$3) AND (title ILIKE $2 OR description ILIKE $2) ORDER BY project_id DESC', [$cid, '%' . $t . '%', $s]);
-    }
-    
-    public static function publicSearch(string $t): array {
-        return q('SELECT p.*, c.company_name FROM project p JOIN company c ON c.company_id=p.company_id WHERE p.title ILIKE $1 OR p.description ILIKE $1 ORDER BY p.project_id DESC LIMIT 100', ['%' . $t . '%']);
-    }
-    
-    public static function recordView($pid, $cid): void { ex('INSERT INTO project_view (project_id, customer_id) VALUES ($1,$2)', [$pid, $cid]); }
-    
-    public static function interest($cid): array {
-        return q('SELECT p.project_id, p.title, (SELECT COUNT(*)::int FROM project_view v WHERE v.project_id=p.project_id) AS views, (SELECT COUNT(*)::int FROM favourite f WHERE f.project_id=p.project_id) AS shortlists FROM project p WHERE p.company_id=$1 ORDER BY p.project_id DESC', [$cid]);
+
+    public static function findById($id): ?array
+    {
+        return q1('SELECT * FROM project WHERE project_id=$1', [$id]);
     }
 
-    // [ITEMS 8 & 9] Cross-company search for the designer's own projects
-    public static function searchAllByOwner($ownerId, string $q, $status = null): array {
+    public static function byCompany($cid, $s = null): array
+    {
+        return q(
+            'SELECT * FROM project WHERE company_id=$1 AND ($2::text IS NULL OR status=$2) ORDER BY project_id DESC',
+            [$cid, $s]
+        );
+    }
+
+    public static function updateProject($id, array $f): ?array
+    {
+        return q1(
+            'UPDATE project
+                SET company_id      = COALESCE($2, company_id),
+                    title           = COALESCE($3, title),
+                    description     = COALESCE($4, description),
+                    status          = COALESCE($5, status),
+                    property_size   = COALESCE($6, property_size),
+                    number_of_rooms = COALESCE($7, number_of_rooms),
+                    updated_at      = now()
+              WHERE project_id = $1 RETURNING *',
+            [
+                $id,
+                $f['company_id'] ?? null,
+                $f['title'] ?? null,
+                $f['description'] ?? null,
+                $f['status'] ?? null,
+                $f['property_size'] ?? null,
+                $f['number_of_rooms'] ?? null,
+            ]
+        );
+    }
+
+    public static function deleteProject($id): void
+    {
+        ex('DELETE FROM project WHERE project_id=$1', [$id]);
+    }
+
+    public static function searchProject($cid, string $t, $s = null): array
+    {
+        return q(
+            'SELECT * FROM project
+              WHERE company_id=$1
+                AND ($3::text IS NULL OR status=$3)
+                AND (title ILIKE $2 OR description ILIKE $2)
+              ORDER BY project_id DESC',
+            [$cid, '%' . $t . '%', $s]
+        );
+    }
+
+    public static function publicSearch(string $t): array
+    {
+        return q(
+            'SELECT p.*, c.company_name
+               FROM project p JOIN company c ON c.company_id=p.company_id
+              WHERE p.title ILIKE $1
+                 OR p.description ILIKE $1
+                 OR p.property_size ILIKE $1
+                 OR CAST(p.number_of_rooms AS TEXT) ILIKE $1
+              ORDER BY p.project_id DESC LIMIT 100',
+            ['%' . $t . '%']
+        );
+    }
+
+    public static function recordView($pid, $cid): void
+    {
+        ex('INSERT INTO project_view (project_id, customer_id) VALUES ($1,$2)', [$pid, $cid]);
+    }
+
+    public static function interest($cid): array
+    {
+        return q(
+            'SELECT p.project_id, p.title,
+                    (SELECT COUNT(*)::int FROM project_view v WHERE v.project_id=p.project_id) AS views,
+                    (SELECT COUNT(*)::int FROM favourite f WHERE f.project_id=p.project_id) AS shortlists
+               FROM project p
+              WHERE p.company_id=$1 ORDER BY p.project_id DESC',
+            [$cid]
+        );
+    }
+
+    public static function searchAllByOwner($ownerId, string $q, $status = null): array
+    {
         $sql = 'SELECT p.*, c.company_name
-                  FROM project p
-                  JOIN company c ON c.company_id = p.company_id
+                  FROM project p JOIN company c ON c.company_id = p.company_id
                  WHERE c.owner_id = $1';
         $params = [$ownerId];
         if ($status !== null && $status !== '') {
@@ -219,8 +319,8 @@ class Project
         return q($sql, $params);
     }
 
-    // [ITEMS 8 & 9] Interest metrics across all of the designer's projects
-    public static function interestAllByOwner($ownerId): array {
+    public static function interestAllByOwner($ownerId): array
+    {
         return q(
             'SELECT p.project_id, p.title,
                     (SELECT COUNT(*)::int FROM project_view v WHERE v.project_id = p.project_id) AS views,
@@ -237,43 +337,64 @@ class Project
 class Favourite
 {
     public static function exists($cid, $pid): bool { return q1('SELECT 1 FROM favourite WHERE customer_id=$1 AND project_id=$2', [$cid, $pid]) !== null; }
-    
+
     public static function saveFavourite($cid, $pid): void { ex('INSERT INTO favourite (customer_id, project_id) VALUES ($1,$2) ON CONFLICT DO NOTHING', [$cid, $pid]); }
-    
-    public static function viewFavourites($cid): array {
-        return q('SELECT f.favourite_id, p.project_id, p.title, p.description, p.status, f.saved_at FROM favourite f JOIN project p ON p.project_id=f.project_id WHERE f.customer_id=$1 ORDER BY f.saved_at DESC', [$cid]);
+
+    public static function viewFavourites($cid): array
+    {
+        return q(
+            'SELECT f.favourite_id, p.project_id, p.title, p.description, p.status,
+                    p.property_size, p.number_of_rooms, f.saved_at
+               FROM favourite f JOIN project p ON p.project_id=f.project_id
+              WHERE f.customer_id=$1 ORDER BY f.saved_at DESC',
+            [$cid]
+        );
     }
-    
-    public static function searchFavourites($cid, string $t): array {
-        return q('SELECT f.favourite_id, p.project_id, p.title, p.description, p.status, f.saved_at FROM favourite f JOIN project p ON p.project_id=f.project_id WHERE f.customer_id=$1 AND (p.title ILIKE $2 OR p.description ILIKE $2)', [$cid, '%' . $t . '%']);
+
+    public static function searchFavourites($cid, string $t): array
+    {
+        return q(
+            'SELECT f.favourite_id, p.project_id, p.title, p.description, p.status,
+                    p.property_size, p.number_of_rooms, f.saved_at
+               FROM favourite f JOIN project p ON p.project_id=f.project_id
+              WHERE f.customer_id=$1 AND (p.title ILIKE $2 OR p.description ILIKE $2)',
+            [$cid, '%' . $t . '%']
+        );
     }
-    
+
     public static function removeFavourite($cid, $pid): void { ex('DELETE FROM favourite WHERE customer_id=$1 AND project_id=$2', [$cid, $pid]); }
 }
 
 class Category
 {
     public static function exists($id): bool { return q1('SELECT 1 FROM category WHERE category_id=$1', [$id]) !== null; }
-    
-    public static function saveCategory(array $f): array {
+
+    public static function saveCategory(array $f): array
+    {
         return q1('INSERT INTO category (category_name, description) VALUES ($1,$2) RETURNING *', [$f['category_name'], $f['description'] ?? null]);
     }
-    
+
     public static function retrieveCategories(): array { return q('SELECT * FROM category ORDER BY category_name'); }
-    
+
     public static function viewCategory($id): ?array { return q1('SELECT * FROM category WHERE category_id=$1', [$id]); }
-    
-    public static function updateCategory($id, array $f): ?array {
-        return q1('UPDATE category SET category_name = COALESCE($2, category_name), description = COALESCE($3, description) WHERE category_id=$1 RETURNING *', [$id, $f['category_name'] ?? null, $f['description'] ?? null]);
+
+    public static function updateCategory($id, array $f): ?array
+    {
+        return q1(
+            'UPDATE category SET category_name = COALESCE($2, category_name), description = COALESCE($3, description) WHERE category_id=$1 RETURNING *',
+            [$id, $f['category_name'] ?? null, $f['description'] ?? null]
+        );
     }
-    
+
     public static function deleteCategory($id): void { ex('DELETE FROM category WHERE category_id=$1', [$id]); }
-    
+
     public static function findCategory(string $t): array { return q('SELECT * FROM category WHERE category_name ILIKE $1 ORDER BY category_name', ['%' . $t . '%']); }
 }
 
-class Report {
-    public static function generate(string $period): array {
+class Report
+{
+    public static function generate(string $period): array
+    {
         $interval = match($period) {
             'daily' => '1 day',
             'weekly' => '7 days',
@@ -287,11 +408,9 @@ class Report {
         $saves = q1("SELECT COUNT(*) as count FROM favourite WHERE saved_at >= NOW() - INTERVAL '$interval'");
 
         $topProjects = q("
-            SELECT 
-                p.title, 
-                c.company_name, 
-                COUNT(DISTINCT v.view_id) as views, 
-                COUNT(DISTINCT f.favourite_id) as shortlists
+            SELECT p.title, c.company_name,
+                   COUNT(DISTINCT v.view_id) as views,
+                   COUNT(DISTINCT f.favourite_id) as shortlists
             FROM project p
             JOIN company c ON p.company_id = c.company_id
             LEFT JOIN project_view v ON p.project_id = v.project_id
