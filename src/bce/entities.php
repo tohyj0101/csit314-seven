@@ -16,7 +16,7 @@ declare(strict_types=1);
  * documented below.
  *
  * Per-class convention:
- *     /** Entity: <ClassName>  |  Original teammate: <ClassName> */
+ *     // Entity: <ClassName>  |  Original teammate: <ClassName>
  *
  * The exception: The report is internally inconsistent about the company
  * entity — page 68 labels it <<Entity>> Company, while page 72 labels it

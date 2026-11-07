@@ -17,7 +17,7 @@ declare(strict_types=1);
  * =============================================================================
  * Every controller class below begins with a one-line marker of the form:
  *
- *   /** Current: <ThisClassName>  |  Original teammate: <OriginalClassName> */
+ *   // Current: <ThisClassName>  |  Original teammate: <OriginalClassName> 
  *
  * Rationale: The original Sprint 0/1 design (per the report's BCE diagrams and
  * UML class names, e.g. "LoginController", "createCompletedProj_Controller")
