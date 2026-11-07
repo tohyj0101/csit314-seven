@@ -1,9 +1,9 @@
 {
   "name": "csit314/seven",
-  "description": "CSIT314 T04: Seven - Interior Designer Matching Platform (PHP)",
+  "description": "CSIT314 T04: Seven - Interior Designer Matching Platform (PHP 8.2)",
   "type": "project",
   "require": {
-    "php": ">=8.1",
+    "php": ">=8.2",
     "ext-pdo": "*",
     "ext-pdo_pgsql": "*",
     "ext-json": "*"
