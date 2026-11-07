@@ -490,11 +490,11 @@ If the pipeline is red, do not merge. Green CI is the entry criterion for review
 
 | Name | Student ID | Role |
 |---|---|---|
-| Sharan Saravanass | 1104809 | Team Lead / System Designer |
+| Sharan Saravana | 1104809 | Team Lead / System Designer |
 | Toh Yong Jie | 1105243 | Backend Dev / DevOps |
 | Lee Hongyi, Ryan | 1124535 | System Designer |
 | Marvin Fong Jun Lin | 1124596 | System Designer |
-| Chiow Jia Long | 1137438 | System Designer / UI/UX |
+| Chiw Jia Long | 1137438 | System Designer / UI/UX |
 
 ---
 
