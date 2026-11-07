@@ -1338,58 +1338,60 @@ async function reports() {
      </div>
   `);
 
-  // Event delegation for the three report buttons
-  app().onclick = async e => {
-    const p = e.target.getAttribute('data-p');
-    if (!p) return;
+  // Attach specific listeners to the report buttons to avoid overwriting global app listeners
+  document.querySelectorAll('button[data-p]').forEach(btn => {
+    btn.onclick = async (e) => {
+      const p = btn.getAttribute('data-p');
+      if (!p) return;
 
-    showMsg('m', 'Generating report...', false);
-    try {
-      const r = await api('/api/reports/' + p);
-      const tEl = $('#t'); if (!tEl) return;
-      tEl.textContent = p.charAt(0).toUpperCase() + p.slice(1) + ' Performance Report';
+      showMsg('m', 'Generating report...', false);
+      try {
+        const r = await api('/api/reports/' + p);
+        const tEl = $('#t'); if (!tEl) return;
+        tEl.textContent = p.charAt(0).toUpperCase() + p.slice(1) + ' Performance Report';
 
-      const smEl = $('#sm'); if (!smEl) return;
+        const smEl = $('#sm'); if (!smEl) return;
 
-      // Render summary KPI cards
-      smEl.innerHTML = `
-         <div class="data-grid" style="grid-template-columns: repeat(4, 1fr); margin-top:0;">
-           <div class="data-card" style="padding: 2rem; text-align:center; border-top: 4px solid var(--primary);">
-             <span style="color:var(--text-muted); font-size:0.9rem; text-transform:uppercase; letter-spacing:1px;">New Users</span><br>
-             <strong style="font-size:3rem; font-weight:300;">${r.summary.new_users}</strong>
+        // Render summary KPI cards
+        smEl.innerHTML = `
+           <div class="data-grid" style="grid-template-columns: repeat(4, 1fr); margin-top:0;">
+             <div class="data-card" style="padding: 2rem; text-align:center; border-top: 4px solid var(--primary);">
+               <span style="color:var(--text-muted); font-size:0.9rem; text-transform:uppercase; letter-spacing:1px;">New Users</span><br>
+               <strong style="font-size:3rem; font-weight:300;">${r.summary.new_users}</strong>
+             </div>
+             <div class="data-card" style="padding: 2rem; text-align:center; border-top: 4px solid var(--primary);">
+               <span style="color:var(--text-muted); font-size:0.9rem; text-transform:uppercase; letter-spacing:1px;">Total Views</span><br>
+               <strong style="font-size:3rem; font-weight:300;">${r.summary.project_views}</strong>
+             </div>
+             <div class="data-card" style="padding: 2rem; text-align:center; border-top: 4px solid var(--primary);">
+               <span style="color:var(--text-muted); font-size:0.9rem; text-transform:uppercase; letter-spacing:1px;">Total Saves</span><br>
+               <strong style="font-size:3rem; font-weight:300;">${r.summary.shortlists}</strong>
+             </div>
+             <div class="data-card" style="padding: 2rem; text-align:center; border-top: 4px solid var(--primary);">
+               <span style="color:var(--text-muted); font-size:0.9rem; text-transform:uppercase; letter-spacing:1px;">New Projects</span><br>
+               <strong style="font-size:3rem; font-weight:300;">${r.summary.new_projects}</strong>
+             </div>
            </div>
-           <div class="data-card" style="padding: 2rem; text-align:center; border-top: 4px solid var(--primary);">
-             <span style="color:var(--text-muted); font-size:0.9rem; text-transform:uppercase; letter-spacing:1px;">Total Views</span><br>
-             <strong style="font-size:3rem; font-weight:300;">${r.summary.project_views}</strong>
-           </div>
-           <div class="data-card" style="padding: 2rem; text-align:center; border-top: 4px solid var(--primary);">
-             <span style="color:var(--text-muted); font-size:0.9rem; text-transform:uppercase; letter-spacing:1px;">Total Saves</span><br>
-             <strong style="font-size:3rem; font-weight:300;">${r.summary.shortlists}</strong>
-           </div>
-           <div class="data-card" style="padding: 2rem; text-align:center; border-top: 4px solid var(--primary);">
-             <span style="color:var(--text-muted); font-size:0.9rem; text-transform:uppercase; letter-spacing:1px;">New Projects</span><br>
-             <strong style="font-size:3rem; font-weight:300;">${r.summary.new_projects}</strong>
-           </div>
-         </div>
-       `;
+         `;
 
-      const tbWrap = $('#tb-wrap'); if (!tbWrap) return;
-      tbWrap.style.display = 'block';
+        const tbWrap = $('#tb-wrap'); if (!tbWrap) return;
+        tbWrap.style.display = 'block';
 
-      // Render Top Projects Table
-      const tbEl = $('#tb'); if (!tbEl) return;
-      tbEl.innerHTML = r.topProjects.map(x => `
-        <tr>
-          <td style="font-weight:500;">${esc(x.title)}</td>
-          <td style="color:var(--text-muted);">${esc(x.company_name)}</td>
-          <td><span class="badge badge-neutral">${x.views}</span></td>
-          <td><span class="badge badge-success">${x.shortlists}</span></td>
-        </tr>
-      `).join('');
-      showMsg('m', '', false);
-      showToast(`${p.charAt(0).toUpperCase() + p.slice(1)} Report generated successfully!`);
-    } catch (ex) { showMsgError('m', ex); }
-  };
+        // Render Top Projects Table
+        const tbEl = $('#tb'); if (!tbEl) return;
+        tbEl.innerHTML = r.topProjects.map(x => `
+          <tr>
+            <td style="font-weight:500;">${esc(x.title)}</td>
+            <td style="color:var(--text-muted);">${esc(x.company_name)}</td>
+            <td><span class="badge badge-neutral">${x.views}</span></td>
+            <td><span class="badge badge-success">${x.shortlists}</span></td>
+          </tr>
+        `).join('');
+        showMsg('m', '', false);
+        showToast(`${p.charAt(0).toUpperCase() + p.slice(1)} Report generated successfully!`);
+      } catch (ex) { showMsgError('m', ex); }
+    };
+  });
 }
 
 // =============================================================================

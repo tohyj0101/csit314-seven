@@ -427,6 +427,8 @@ The frontend renders these as styled error toasts.
 
 For a live demo, here is a suggested flow that exercises the platform end-to-end in about 5 minutes:
 
+*Note: To demonstrate the Reports feature with realistic data (100+ synthetic records), ensure you run `php db/generate_test_data.php` beforehand.*
+
 1. **Login as admin** — show that the nav bar only contains admin modules (RBAC working).
 2. **Logout. Login as `suspended@example.test`** — show the 403 error toast.
 3. **Login as designer** — create a new company, create a new project, view the project analytics (views + saves).
