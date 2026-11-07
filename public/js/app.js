@@ -1,24 +1,48 @@
 // =============================================================================
 // CSIT314 T04: Seven - Frontend Application Logic (Boundary Layer)
 // =============================================================================
+// Report §BCE Architecture (p.189):
+//   "Boundary-Control-Entity (BCE) architecture... frontend treats the backend
+//    as a REST API."
+// This file NEVER talks to the database directly. It calls /api/* endpoints,
+// receives JSON, and renders the DOM. 
+//
+// DEMO TIP:
+//   - grep for "// [SECTION:" to jump between major features.
+//   - grep for "async function" to find page renderers.
+//   - The `route()` function at the bottom acts as the SPA router.
+// =============================================================================
 
 // =============================================================================
-// 1. HTTP CLIENT + ERROR HELPERS
+// [SECTION: HTTP CLIENT & ERROR HANDLING]
+// =============================================================================
+// All API calls funnel through `api()`. On failure, it throws an Error object
+// containing the HTTP status and the server's rich error payload (displayData).
+// The helpers below (`errorDisplay`, `errorHtml`, etc.) parse that payload to
+// render consistent, severity-styled alerts/toasts across the app.
 // =============================================================================
 
+/**
+ * Central fetch wrapper.
+ * @param {string} u - The endpoint URL (e.g., '/api/users').
+ * @param {object} o - Fetch options (method, body, headers).
+ * @returns {Promise<object>} The parsed JSON response.
+ * @throws {Error} Throws an error with `.status` and `.displayData` on failure.
+ */
 async function api(u, o = {}) {
   try {
     const r = await fetch(u, {
-      credentials: 'include',
+      credentials: 'include', // Crucial: sends the PHPSESSID cookie
       headers: { 'Content-Type': 'application/json', ...(o.headers || {}) },
       method: o.method || 'GET',
       body: o.body
     });
 
     let b = null;
-    try { b = await r.json(); } catch (_) { }
+    try { b = await r.json(); } catch (_) { } // Handle empty responses safely
 
     if (!r.ok) {
+      // Extract the error message from the backend's rich payload
       const msg =
         (b && (b.error || b.message)) ||
         (r.status === 401 ? 'Your session has expired. Please log in again.' :
@@ -30,11 +54,12 @@ async function api(u, o = {}) {
 
       const err = new Error(msg);
       err.status = r.status;
-      if (b && b.display) err.displayData = b;
+      if (b && b.display) err.displayData = b; // Attach server's rich error payload
       throw err;
     }
     return b || {};
   } catch (err) {
+    // Network failures (e.g., server is down)
     if (err.name === 'TypeError' && err.message.includes('Failed to fetch')) {
       const netErr = new Error('Unable to connect to the server. Please check your internet connection.');
       netErr.status = 0;
@@ -44,6 +69,9 @@ async function api(u, o = {}) {
   }
 }
 
+/**
+ * Maps HTTP status codes to UI severity levels (info, warning, error, critical).
+ */
 function statusSeverity(s) {
   if (s >= 500) return 'critical';
   if (s === 401 || s === 403 || s === 404) return 'info';
@@ -51,6 +79,9 @@ function statusSeverity(s) {
   return 'error';
 }
 
+/**
+ * Normalises the error object for display.
+ */
 function errorDisplay(ex) {
   const d = ex.displayData || {};
   const sev = d.severity || statusSeverity(ex.status);
@@ -66,6 +97,10 @@ function errorDisplay(ex) {
   };
 }
 
+/**
+ * Returns an HTML string for a page-level error alert.
+ * If the backend provided pre-rendered HTML, it uses that directly.
+ */
 function errorHtml(ex) {
   const d = errorDisplay(ex);
   if (d.html) return d.html;
@@ -78,6 +113,9 @@ function errorHtml(ex) {
   </div>`;
 }
 
+/**
+ * Renders a floating toast notification for errors.
+ */
 function showDisplayToast(d) {
   let container = document.getElementById('toast-container');
   if (!container) {
@@ -107,14 +145,31 @@ function showDisplayToast(d) {
   container.appendChild(toast);
 }
 
+/**
+ * Convenience wrapper to immediately show an error toast from a caught exception.
+ */
 function notifyError(ex) {
   showDisplayToast(errorDisplay(ex));
 }
 
-// --- utils ------------------------------------------------------------------
-const esc = s => String(s ?? '').replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
-const $ = s => document.querySelector(s), app = () => $('#app');
+// =============================================================================
+// [SECTION: UTILS & PERMISSIONS]
+// =============================================================================
 
+/** Escapes HTML characters to prevent XSS attacks during DOM injection. */
+const esc = s => String(s ?? '').replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
+
+/** Shortcut for document.querySelector. */
+const $ = s => document.querySelector(s);
+
+/** Shortcut for document.getElementById('app'). */
+const app = () => $('#app');
+
+/**
+ * Maps coarse permission keys (stored in user_profile.permissions in the DB)
+ * to fine-grained UI capabilities. This map is primarily used by `parsePermissions()`
+ * to translate raw DB permission strings into human-readable labels.
+ */
 const PERMISSION_MAP = {
   'user:manage': ['Create User Account', 'Update User Account', 'View User Account', 'Suspend User Account', 'Search User Account'],
   'profile:manage': ['Create User Profile', 'Update User Profile', 'View User Profile', 'Suspend User Profile', 'Search User Profile'],
@@ -127,6 +182,9 @@ const PERMISSION_MAP = {
   'report:generate': ['Generate Daily Reports', 'Generate Weekly Reports', 'Generate Monthly Reports']
 };
 
+/**
+ * Provides a human-readable label for a coarse permission key (e.g. 'user:manage').
+ */
 function getPermissionLabel(p) {
   const labels = {
     'user:manage': 'Manage User Accounts',
@@ -142,20 +200,35 @@ function getPermissionLabel(p) {
   return labels[p] || p;
 }
 
+/**
+ * Translates raw DB permission strings (e.g. "{user:manage,profile:manage}")
+ * into an array of granular UI capabilities using PERMISSION_MAP.
+ */
 function parsePermissions(perms) {
   let arr = [];
-  if (Array.isArray(perms)) { arr = perms; }
-  else if (typeof perms === 'string') {
-    if (perms.startsWith('{') && perms.endsWith('}')) { arr = perms.slice(1, -1).split(',').filter(Boolean); }
-    else { arr = perms.split(',').map(s => s.trim()).filter(Boolean); }
+  if (Array.isArray(perms)) {
+    arr = perms;
+  } else if (typeof perms === 'string') {
+    if (perms.startsWith('{') && perms.endsWith('}')) { 
+      arr = perms.slice(1, -1).split(',').filter(Boolean); 
+    } else { 
+      arr = perms.split(',').map(s => s.trim()).filter(Boolean); 
+    }
   }
   let result = [];
   arr.forEach(p => {
-    if (PERMISSION_MAP[p]) { result.push(...PERMISSION_MAP[p]); } else { result.push(p); }
+    if (PERMISSION_MAP[p]) {
+      result.push(...PERMISSION_MAP[p]);
+    } else {
+      result.push(p);
+    }
   });
   return result;
 }
 
+/**
+ * Simple debounce function to prevent spamming the search API on every keystroke.
+ */
 function debounce(func, delay) {
   let timeout;
   return function (...args) {
@@ -164,6 +237,9 @@ function debounce(func, delay) {
   };
 }
 
+/**
+ * Renders a success/error toast for simple actions (non-server errors).
+ */
 function showToast(msg, isError = false) {
   let container = document.getElementById('toast-container');
   if (!container) {
@@ -181,12 +257,22 @@ function showToast(msg, isError = false) {
   }, 3500);
 }
 
+/**
+ * Sets a flash message in sessionStorage to be shown on the next page load.
+ */
 function flash(msg) { sessionStorage.setItem('flashMsg', msg); }
+
+/**
+ * Checks for and displays a flash message.
+ */
 function checkFlash() {
   const msg = sessionStorage.getItem('flashMsg');
   if (msg) { showToast(msg); sessionStorage.removeItem('flashMsg'); }
 }
 
+/**
+ * Renders a simple text message in a form (e.g., "Saving...").
+ */
 function showMsg(id, text, isError) {
   const el = $('#' + id);
   if (!el) return;
@@ -198,6 +284,9 @@ function showMsg(id, text, isError) {
   el.style.display = '';
 }
 
+/**
+ * Renders a structured inline error alert (used inside forms).
+ */
 function showMsgError(id, ex) {
   const el = $('#' + id);
   if (!el) return;
@@ -217,6 +306,9 @@ function showMsgError(id, ex) {
   el.style.fontWeight = '';
 }
 
+/**
+ * Generates the standard page header markup.
+ */
 const pageHeader = (title, desc) => `
   <div class="page-header">
     <h1>${title}</h1>
@@ -224,10 +316,16 @@ const pageHeader = (title, desc) => `
   </div>
 `;
 
+/**
+ * The SPA Shell. Renders the navigation bar based on user permissions,
+ * and wraps the provided page content in a <main> container.
+ * @param {string} h - The inner HTML of the page.
+ */
 const shell = h => {
   const u = window.__user, links = [['#/', 'Dashboard']];
   const perms = u.permissions || [];
 
+  // Dynamically build navigation links based on permissions (RBAC)
   if (perms.includes('user:manage') || perms.includes('profile:manage')) {
     if (!links.find(l => l[0] === '#/admin')) links.push(['#/admin', 'User Accounts']);
     if (!links.find(l => l[0] === '#/profiles')) links.push(['#/profiles', 'User Profiles']);
@@ -245,8 +343,10 @@ const shell = h => {
     if (!links.find(l => l[0] === '#/reports')) links.push(['#/reports', 'Reports']);
   }
 
+  // Render nav + main content
   app().innerHTML = `<nav> ${links.map(([h, l]) => `<a href="${h}">${l}</a>`).join('')} <button id="lo">Logout</button> </nav> <main class="card">${h}</main>`;
 
+  // Attach logout handler
   $('#lo').onclick = async () => {
     await api('/api/auth/logout', { method: 'POST' });
     window.__user = null;
@@ -255,8 +355,13 @@ const shell = h => {
 }
 
 // =============================================================================
-// 2. AUTHENTICATION & DASHBOARD
+// [SECTION: AUTHENTICATION & DASHBOARD]
 // =============================================================================
+
+/** 
+ * US #1, #13, #35, #39 - Login Screen.
+ * Renders the login form and handles submission.
+ */
 function login() {
   app().innerHTML = `<main class="card" style="max-width:480px; margin-top:100px;"> ${pageHeader('Sign In', 'Enter your credentials to access the internal dashboard based on your assigned User Profile.')} <form id="f"> <div class="form-group"><label>Email</label><input name="email" type="email" required /></div> <div class="form-group"><label>Password</label><input name="password" type="password" placeholder="Enter your password..." required /></div> <p id="m" class="error"></p> <button type="submit" class="btn btn-elegant" style="width:100%;">Login</button> </form> </main>`;
 
@@ -275,29 +380,38 @@ function login() {
   };
 }
 
+/**
+ * Renders the Dashboard.
+ * Shows/hides module cards based on the user's permissions.
+ */
 async function dashboard() {
   const perms = window.__user.permissions || [];
   const name = esc(window.__user.username);
   const roleName = esc(window.__user.role);
   let cards = '';
 
+  // Admin modules
   if (perms.includes('user:manage') || perms.includes('profile:manage')) {
     cards += `<div class="data-card" style="padding: 2.5rem 2rem; text-align: center;"> <h3 style="margin-bottom: 1rem; font-size: 1.5rem;">User Accounts</h3> <p class="meta-text" style="margin-bottom: 2rem;">Manage platform users, reset credentials, and toggle account access.</p> <a href="#/admin" class="btn btn-elegant" style="width: 100%;">Manage User Accounts</a> </div>`;
     cards += `<div class="data-card" style="padding: 2.5rem 2rem; text-align: center;"> <h3 style="margin-bottom: 1rem; font-size: 1.5rem;">User Profiles</h3> <p class="meta-text" style="margin-bottom: 2rem;">Configure system roles and assign granular module permissions.</p> <a href="#/profiles" class="btn btn-elegant" style="width: 100%;">Manage User Profiles</a> </div>`;
   }
+  // Designer modules
   if (perms.includes('company:manage') || perms.includes('project:manage')) {
     cards += `<div class="data-card" style="padding: 2.5rem 2rem; text-align: center;"> <h3 style="margin-bottom: 1rem; font-size: 1.5rem;">Portfolio Projects</h3> <p class="meta-text" style="margin-bottom: 2rem;">Upload new designs, track project status, and view engagement metrics.</p> <a href="#/projects" class="btn btn-elegant" style="width: 100%;">View Portfolio</a> </div>`;
     cards += `<div class="data-card" style="padding: 2.5rem 2rem; text-align: center;"> <h3 style="margin-bottom: 1rem; font-size: 1.5rem;">Company Entities</h3> <p class="meta-text" style="margin-bottom: 2rem;">Update your registered business details and contact information.</p> <a href="#/companies" class="btn btn-elegant" style="width: 100%;">Manage Companies</a> </div>`;
   }
+  // Customer modules
   if (perms.includes('project:view') || perms.includes('favourite:manage')) {
     cards += `<div class="data-card" style="padding: 2.5rem 2rem; text-align: center;"> <h3 style="margin-bottom: 1rem; font-size: 1.5rem;">Discovery Gallery</h3> <p class="meta-text" style="margin-bottom: 2rem;">Explore our curated collection of premium interior designs.</p> <a href="#/browse" class="btn btn-elegant" style="width: 100%;">Browse Designs</a> </div>`;
     cards += `<div class="data-card" style="padding: 2.5rem 2rem; text-align: center;"> <h3 style="margin-bottom: 1rem; font-size: 1.5rem;">My Favourites</h3> <p class="meta-text" style="margin-bottom: 2rem;">Review the rooms and projects you have saved to your mood board.</p> <a href="#/favourites" class="btn btn-elegant" style="width: 100%;">View Shortlists</a> </div>`;
   }
+  // Platform Manager modules
   if (perms.includes('category:manage') || perms.includes('report:generate')) {
     cards += `<div class="data-card" style="padding: 2.5rem 2rem; text-align: center;"> <h3 style="margin-bottom: 1rem; font-size: 1.5rem;">Executive Reports</h3> <p class="meta-text" style="margin-bottom: 2rem;">Generate traffic, engagement, and user acquisition analytics.</p> <a href="#/reports" class="btn btn-elegant" style="width: 100%;">View Analytics</a> </div>`;
     cards += `<div class="data-card" style="padding: 2.5rem 2rem; text-align: center;"> <h3 style="margin-bottom: 1rem; font-size: 1.5rem;">Categories</h3> <p class="meta-text" style="margin-bottom: 2rem;">Maintain the standard classification tags used across the platform.</p> <a href="#/categories" class="btn btn-elegant" style="width: 100%;">Manage Categories</a> </div>`;
   }
 
+  // Fallback if user has no permissions
   if (!cards) {
     cards = `<p class="error" style="grid-column: 1 / -1;">No modules have been assigned to your profile. Please contact the administrator.</p>`;
   }
@@ -307,8 +421,12 @@ async function dashboard() {
 }
 
 // =============================================================================
-// 3. USER ACCOUNTS (Admin Only)
+// [SECTION: USER ACCOUNTS] US #3–#7 (Admin Only)
 // =============================================================================
+
+/**
+ * US #7, #5 - User Account List & Search
+ */
 async function adminList() {
   checkFlash();
   shell(`${pageHeader('User Account Management', 'Manage platform users, roles, and account statuses.')} <div class="actions" style="justify-content: center; margin-bottom: 2rem;"> <a href="#/admin/create" class="btn btn-elegant">+ Create New User Account</a> </div> <div class="search-bar"> <input id="q" placeholder="Search by username or email..." style="flex:1;" /> <button class="btn btn-elegant" id="s">Search</button> <button class="btn btn-outline" id="r">Reset</button> </div> <div id="tb"></div>`);
@@ -328,6 +446,7 @@ async function adminList() {
   $('#s').onclick = () => reload($('#q').value);
   $('#r').onclick = () => { $('#q').value = ''; reload(); };
 
+  // Handle Suspend/Activate clicks via event delegation
   $('#tb').onclick = async e => {
     const btn = e.target.closest('[data-s]');
     if (btn) {
@@ -343,6 +462,9 @@ async function adminList() {
   await reload();
 }
 
+/**
+ * US #3 - Create User Account
+ */
 async function adminCreate() {
   let P = (await api('/api/profiles')).profiles;
   shell(`${pageHeader('Create User Account', 'Provision a new system user and assign their User Profile.')} <form id="cf" style="max-width: 600px; margin: 0 auto;"> <div class="form-group"><label>Username</label><input name="username" placeholder="e.g., johndoe" required /></div> <div class="form-group"><label>Email Address</label><input name="email" type="email" placeholder="e.g., john@example.com" required /></div> <div class="form-group"><label>Temporary Password</label><input name="password" type="password" placeholder="Enter a secure password..." required /></div> <div class="form-group"> <label>Assign User Profile</label> <select name="profile_id">${P.map(p => `<option value="${p.profile_id}">${esc(p.profile_name)}</option>`).join('')}</select> </div> <p id="m" class="error"></p> <div class="actions" style="justify-content: center; margin-top: 2rem;"> <button type="submit" class="btn btn-elegant">Create User Account</button> <a href="#/admin" class="btn btn-outline">Cancel</a> </div> </form>`);
@@ -360,6 +482,9 @@ async function adminCreate() {
   };
 }
 
+/**
+ * US #5 - View User Account
+ */
 async function adminView(id) {
   try {
     const r = await api('/api/users/' + id);
@@ -381,6 +506,9 @@ async function adminView(id) {
   }
 }
 
+/**
+ * US #4 - Update User Account
+ */
 async function adminEdit(id) {
   try {
     const r = await api('/api/users/' + id);
@@ -404,8 +532,12 @@ async function adminEdit(id) {
 }
 
 // =============================================================================
-// 4. USER PROFILES (Admin Only)
+// [SECTION: USER PROFILES] US #8–#12 (Admin Only)
 // =============================================================================
+
+/**
+ * US #12, #10 - List & Search User Profiles
+ */
 async function profilesList() {
   checkFlash();
   shell(`${pageHeader('User Profiles', 'Manage platform roles and their granular system permissions.')} <div class="actions" style="justify-content: center; margin-bottom: 2rem;"> <a href="#/profiles/create" class="btn btn-elegant">+ Create New User Profile</a> </div> <div class="search-bar"> <input id="q" placeholder="Search by profile name..." style="flex:1;" /> <button class="btn btn-elegant" id="s">Search</button> <button class="btn btn-outline" id="r">Reset</button> </div> <div id="tb"></div>`);
@@ -440,6 +572,9 @@ async function profilesList() {
   await reload();
 }
 
+/**
+ * US #8 - Create User Profile
+ */
 async function profilesCreate() {
   const perms = ['user:manage', 'profile:manage', 'company:manage', 'project:manage', 'interest:view', 'project:view', 'favourite:manage', 'category:manage', 'report:generate'];
   const checkboxes = perms.map(p => {
@@ -462,6 +597,9 @@ async function profilesCreate() {
   };
 }
 
+/**
+ * US #10 - View User Profile
+ */
 async function profilesView(id) {
   try {
     const r = await api('/api/profiles/' + id);
@@ -495,12 +633,16 @@ async function profilesView(id) {
   }
 }
 
+/**
+ * US #9 - Update User Profile
+ */
 async function profilesEdit(id) {
   try {
     const r = await api('/api/profiles/' + id);
     const perms = ['user:manage', 'profile:manage', 'company:manage', 'project:manage', 'interest:view', 'project:view', 'favourite:manage', 'category:manage', 'report:generate'];
 
     const checkboxes = perms.map(p => {
+      // Handle Postgres TEXT[] representation robustly
       const isChecked = (r.profile.permissions || []).includes(p) ||
                         (Array.isArray(r.profile.permissions) && r.profile.permissions.includes(p)) ||
                         (typeof r.profile.permissions === 'string' && r.profile.permissions.includes(p));
@@ -543,8 +685,12 @@ async function profilesEdit(id) {
 }
 
 // =============================================================================
-// 5. COMPANY INFORMATION (Designer Only)
+// [SECTION: COMPANY INFORMATION] US #15–#19 (Designer Only)
 // =============================================================================
+
+/**
+ * US #19, #16 - List & Search Companies
+ */
 async function companiesList() {
   checkFlash();
   shell(`${pageHeader('Company Directory', 'Manage your associated business entities before attaching projects.')} <div class="actions" style="justify-content: center; margin-bottom: 2rem;"> <a href="#/companies/create" class="btn btn-elegant">+ Create Company</a> </div> <div class="search-bar"> <input id="q" placeholder="Search by company name or address..." style="flex:1;" /> <button class="btn btn-elegant" id="s">Search</button> <button class="btn btn-outline" id="r">Reset</button> </div> <div id="tb"></div>`);
@@ -575,6 +721,7 @@ async function companiesList() {
   $('#s').onclick = () => reload($('#q').value);
   $('#r').onclick = () => { $('#q').value = ''; reload(); };
 
+  // Delete confirmation
   $('#tb').onclick = async e => {
     const di = e.target.getAttribute('data-d');
     if (di && confirm('Delete Company #' + di + ' permanently?\n\nNote: companies with linked projects cannot be deleted — you must delete their projects first.')) {
@@ -588,6 +735,9 @@ async function companiesList() {
   await reload();
 }
 
+/**
+ * US #15 - Create Company
+ */
 async function companiesCreate() {
   shell(`${pageHeader('Create Company Information', 'Enter your corporate details to associate future interior design projects.')}
     <form id="f" style="max-width: 600px; margin: 0 auto;">
@@ -607,10 +757,13 @@ async function companiesCreate() {
   $('#f').onsubmit = async e => {
     e.preventDefault();
     const b = Object.fromEntries(new FormData(e.target));
+    
+    // Frontend validation for 8-digit contact number
     if (b.contact_no && !/^\d{8}$/.test(b.contact_no)) {
       showMsgError('m', Object.assign(new Error('Contact Hotline must be exactly 8 digits.'), { status: 400 }));
       return;
     }
+    
     showMsg('m', 'Saving...', false);
     try {
       await api('/api/companies', { method: 'POST', body: JSON.stringify(b) });
@@ -620,6 +773,9 @@ async function companiesCreate() {
   };
 }
 
+/**
+ * US #16 - View Company
+ */
 async function companiesView(id) {
   try {
     const r = await api('/api/companies/' + id);
@@ -638,6 +794,9 @@ async function companiesView(id) {
   } catch (ex) { shell(errorHtml(ex)); }
 }
 
+/**
+ * US #17 - Update Company
+ */
 async function companiesEdit(id) {
   try {
     const r = await api('/api/companies/' + id);
@@ -674,8 +833,14 @@ async function companiesEdit(id) {
 }
 
 // =============================================================================
-// 6. PROJECTS (Designer Only)
+// [SECTION: PROJECTS] US #20–#31, #37, #38 (Designer Only)
 // =============================================================================
+
+/**
+ * US #21, #24, #37, #38 - Project Workspace & Analytics.
+ * This is the main designer dashboard where they can see their projects
+ * and the aggregated view/save metrics (which link to US #37/#38).
+ */
 async function projectsList() {
   checkFlash();
   let CS = (await api('/api/companies')).companies;
@@ -705,11 +870,12 @@ async function projectsList() {
 
   const reload = async q => {
     try {
-      im = {};
+      im = {}; // Clear previous metrics
       const st = $('#st').value;
       const u = '/api/projects/search?q=' + encodeURIComponent(q) + (st ? '&status=' + encodeURIComponent(st) : '');
       L = (await api(u)).projects;
 
+      // Fetch analytics (US #37/#38) and map them by project_id
       try {
         const ri = await api('/api/projects/search/interest');
         (ri.interest || []).forEach(i => im[i.project_id] = i);
@@ -721,6 +887,7 @@ async function projectsList() {
       if (L.length === 0) { tb.innerHTML = '<p class="error">❌ No projects found for this criteria.</p>'; }
       else {
         tb.innerHTML = `<div class="data-grid">` + L.map(p => {
+          // Fallback to 0 if no analytics data exists for this project
           const i = im[p.project_id] || { views: 0, shortlists: 0 };
           return `
             <div class="data-card">
@@ -758,6 +925,7 @@ async function projectsList() {
     const st = btn.getAttribute('data-st');
     if (!confirm('Delete Project #' + di + ' permanently?')) return;
     try {
+      // Use the specific endpoint if it's a completed project
       const url = '/api/projects/' + di + (st === 'Completed' ? '/completed' : '');
       await api(url, { method: 'DELETE' });
       showToast('Project deleted successfully!');
@@ -767,6 +935,9 @@ async function projectsList() {
   await reload('');
 }
 
+/**
+ * US #20, #25 - Create New Project
+ */
 async function projectsCreate() {
   let CS = (await api('/api/companies')).companies;
   if (!CS.length) return shell(pageHeader('Create New Project', '❌ Missing company requirement.') + `<a href="#/companies" class="btn btn-outline">Back</a>`);
@@ -800,6 +971,7 @@ async function projectsCreate() {
     b.company_id = +b.company_id;
     showMsg('m', 'Saving...', false);
     try {
+      // Dynamically choose the correct endpoint based on status
       const endpoint = (b.status === 'Completed') ? '/api/projects/completed' : '/api/projects';
       await api(endpoint, { method: 'POST', body: JSON.stringify(b) });
       flash('Project created successfully!');
@@ -808,6 +980,9 @@ async function projectsCreate() {
   };
 }
 
+/**
+ * US #21, #26 - View Project Details
+ */
 async function projectsView(id) {
   try {
     const r = await api('/api/projects/' + id);
@@ -829,11 +1004,16 @@ async function projectsView(id) {
   } catch (ex) { shell(errorHtml(ex)); }
 }
 
+/**
+ * US #22, #27 - Update Project Details
+ */
 async function projectsEdit(id) {
   try {
     const r  = await api('/api/projects/' + id);
     const CS = (await api('/api/companies')).companies;
     const p  = r.project;
+    
+    // Dynamically choose the correct update endpoint based on the current status
     const putEndpoint = (p.status === 'Completed')
       ? '/api/projects/' + id + '/completed'
       : '/api/projects/' + id;
@@ -877,8 +1057,12 @@ async function projectsEdit(id) {
 }
 
 // =============================================================================
-// 7. CUSTOMER BROWSE (Customer Only)
+// [SECTION: CUSTOMER BROWSE] US #30, #31 (Customer Only)
 // =============================================================================
+
+/**
+ * US #30 - Discovery Gallery Search
+ */
 async function browseList() {
   shell(`
     ${pageHeader('Discovery Gallery', 'Discover visually striking interior design projects and save your inspirations.')}
@@ -917,6 +1101,7 @@ async function browseList() {
   $('#s').onclick = () => reload($('#q').value);
   $('#r').onclick = () => { $('#q').value = ''; reload(); };
 
+  // Handle Save to Favourites (US #32)
   $('#tb').onclick = async e => {
     const btn = e.target.closest('[data-s2]');
     if (btn) {
@@ -929,6 +1114,9 @@ async function browseList() {
   await reload();
 }
 
+/**
+ * US #31 - View Public Project (triggers view count increment on backend)
+ */
 async function browseView(id) {
   try {
     const r = await api('/api/projects/public/' + id);
@@ -948,8 +1136,12 @@ async function browseView(id) {
 }
 
 // =============================================================================
-// 8. CUSTOMER FAVOURITES (Customer Only)
+// [SECTION: CUSTOMER FAVOURITES] US #32–#34 (Customer Only)
 // =============================================================================
+
+/**
+ * US #33, #34 - My Shortlists (List & Search Favourites)
+ */
 async function favouritesList() {
   checkFlash();
   shell(`
@@ -987,6 +1179,7 @@ async function favouritesList() {
   $('#s').onclick = () => reload($('#q').value);
   $('#r').onclick = () => { $('#q').value = ''; reload(); };
 
+  // Handle Remove Favourite
   $('#tb').onclick = async e => {
     const btn = e.target.closest('[data-x]');
     if (btn) {
@@ -1001,8 +1194,12 @@ async function favouritesList() {
 }
 
 // =============================================================================
-// 9. CATEGORIES (Platform Manager Only)
+// [SECTION: CATEGORIES] US #41–#45 (Platform Manager Only)
 // =============================================================================
+
+/**
+ * US #42, #45 - List & Search Categories
+ */
 async function categoriesList() {
   checkFlash();
   shell(`${pageHeader('Category Management', 'Curate standard design categories ensuring systemic consistency.')} <div class="actions" style="justify-content: center; margin-bottom: 2rem;"> <a href="#/categories/create" class="btn btn-elegant">+ Create New Category</a> </div> <div class="search-bar"> <input id="q" placeholder="Search by category name..." style="flex:1;" /> <button class="btn btn-elegant" id="s">Search</button> <button class="btn btn-outline" id="r">Reset</button> </div> <div id="tb"></div>`);
@@ -1047,6 +1244,9 @@ async function categoriesList() {
   await reload();
 }
 
+/**
+ * US #41 - Create Category
+ */
 async function categoriesCreate() {
   shell(`${pageHeader('Create IDP Category', 'Standardize a new classification for portfolios.')} <form id="f" style="max-width: 600px; margin: 0 auto;"> <div class="form-group"><label>Category Name</label><input name="category_name" placeholder="e.g., Residential" required/></div> <div class="form-group"><label>Description</label><textarea name="description" rows="4" placeholder="Describe what this category entails..."></textarea></div> <p id="m" class="error"></p> <div class="actions" style="justify-content: center; margin-top: 2rem;"> <button type="submit" class="btn btn-elegant">Create IDP Category</button> <a href="#/categories" class="btn btn-outline">Cancel</a> </div> </form>`);
 
@@ -1062,6 +1262,9 @@ async function categoriesCreate() {
   };
 }
 
+/**
+ * US #42 - View Category
+ */
 async function categoriesView(id) {
   try {
     const r = await api('/api/categories/' + id);
@@ -1079,6 +1282,9 @@ async function categoriesView(id) {
   } catch (ex) { shell(errorHtml(ex)); }
 }
 
+/**
+ * US #43 - Update Category
+ */
 async function categoriesEdit(id) {
   try {
     const r = await api('/api/categories/' + id);
@@ -1098,8 +1304,13 @@ async function categoriesEdit(id) {
 }
 
 // =============================================================================
-// 10. REPORTS (Platform Manager Only)
+// [SECTION: REPORTS] US #46–#48 (Platform Manager Only)
 // =============================================================================
+
+/**
+ * Renders the Reports Page.
+ * Dynamically fetches and renders Daily, Weekly, or Monthly reports.
+ */
 async function reports() {
   shell(`
     ${pageHeader('Executive Platform Analytics', 'View platform performance and engagement metrics.')}
@@ -1127,6 +1338,7 @@ async function reports() {
      </div>
   `);
 
+  // Event delegation for the three report buttons
   app().onclick = async e => {
     const p = e.target.getAttribute('data-p');
     if (!p) return;
@@ -1139,6 +1351,7 @@ async function reports() {
 
       const smEl = $('#sm'); if (!smEl) return;
 
+      // Render summary KPI cards
       smEl.innerHTML = `
          <div class="data-grid" style="grid-template-columns: repeat(4, 1fr); margin-top:0;">
            <div class="data-card" style="padding: 2rem; text-align:center; border-top: 4px solid var(--primary);">
@@ -1163,6 +1376,7 @@ async function reports() {
       const tbWrap = $('#tb-wrap'); if (!tbWrap) return;
       tbWrap.style.display = 'block';
 
+      // Render Top Projects Table
       const tbEl = $('#tb'); if (!tbEl) return;
       tbEl.innerHTML = r.topProjects.map(x => `
         <tr>
@@ -1179,20 +1393,27 @@ async function reports() {
 }
 
 // =============================================================================
-// 11. DIRECTORY ROUTER
+// [SECTION: DIRECTORY ROUTER]
 // =============================================================================
+// This is the SPA Hash Router. It reads `window.location.hash` and decides
+// which view function to call. It also enforces frontend RBAC.
+// =============================================================================
+
 async function route() {
+  // Example hash: "#/admin/view/12" -> page="admin", action="view", id="12"
   const hash = (location.hash || '#/').replace(/^#\/?/, '');
   const parts = hash.split('/');
   const page = parts[0];
   const action = parts[1];
   const id = parts[2];
 
+  // Rehydrate user session on every route change to ensure permissions are up-to-date
   try { window.__user = (await api('/api/auth/me')).user; }
-  catch (_) { return login(); }
+  catch (_) { return login(); } // If 401, redirect to login screen
 
   const perms = window.__user.permissions || [];
 
+  // --- 1. Admin Routes ---
   if (page === 'admin' || page === 'profiles') {
     if (!perms.includes('user:manage') && !perms.includes('profile:manage')) return dashboard();
     if (page === 'admin') {
@@ -1209,6 +1430,7 @@ async function route() {
     }
   }
 
+  // --- 2. Designer Routes ---
   if (page === 'companies' || page === 'projects') {
     if (!perms.includes('company:manage') && !perms.includes('project:manage')) return dashboard();
     if (page === 'companies') {
@@ -1225,6 +1447,7 @@ async function route() {
     }
   }
 
+  // --- 3. Customer Routes ---
   if (page === 'browse' || page === 'favourites') {
     if (!perms.includes('project:view') && !perms.includes('favourite:manage')) return dashboard();
     if (page === 'browse') {
@@ -1234,6 +1457,7 @@ async function route() {
     if (page === 'favourites') return favouritesList();
   }
 
+  // --- 4. Platform Manager Routes ---
   if (page === 'categories' || page === 'reports') {
     if (!perms.includes('category:manage') && !perms.includes('report:generate')) return dashboard();
     if (page === 'categories') {
@@ -1245,8 +1469,12 @@ async function route() {
     if (page === 'reports') return reports();
   }
 
+  // --- 5. Fallback ---
   return dashboard();
 }
 
+// Listen for URL changes and trigger the router
 window.addEventListener('hashchange', route);
+
+// Initial route execution when the app first loads
 route();
