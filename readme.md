@@ -2,7 +2,7 @@
 
 A full-stack web platform that connects renovation customers with interior designers. Built with PHP, PostgreSQL, and vanilla JavaScript on a Boundary–Control–Entity (BCE) architecture, following Agile/Scrum with CI/CD and integration testing.
 
-**Status:** All 48 user stories implemented. 20 integration tests, 86 assertions, 100% pass rate.
+**Status:** All 48 user stories implemented. 21 integration tests, 100% pass rate.
 
 ---
 
@@ -135,7 +135,7 @@ Strict Boundary–Control–Entity (BCE) separation:
 
 **Required:**
 
-- **PHP 8.1+** with extensions: `pdo_pgsql`, `pgsql`, `openssl`, `mbstring`
+- **PHP 8.2+** with extensions: `pdo_pgsql`, `pgsql`, `openssl`, `mbstring`
 - **PostgreSQL 14+** (running as a service)
 - **Composer** (for `composer install`)
 
@@ -241,7 +241,7 @@ The integration test suite exercises the full Boundary → Control → Entity st
 
 Expected output:
 
-    OK (20 tests, 86 assertions)
+    OK (21 tests, 95+ assertions)
 
 **Coverage:** all 48 user stories across:
 
@@ -254,6 +254,7 @@ Expected output:
 - Report generation (daily / weekly / monthly)
 - RBAC enforcement (403 on cross-role access)
 - Cascade rules (400 on delete of company with projects)
+- **TDD Evidence:** Includes an isolated test (`test_37_view_project_views`) for US #37 (View Number of Views) demonstrating the Red-Green-Refactor cycle documented in the report.
 
 **Prerequisites:** the local server must be reachable at `http://localhost:8000` (the test bootstrap auto-launches one via `tests/bootstrap.php` if none is running).
 
@@ -291,7 +292,7 @@ Expected output:
     │       └── style.css
     │
     ├── tests/
-    │   ├── AllTest.php                # 20 integration test methods
+    │   ├── AllTest.php                # 21 integration test methods
     │   └── bootstrap.php              # Auto-launches server for tests
     │
     ├── .github/
@@ -494,7 +495,7 @@ If the pipeline is red, do not merge. Green CI is the entry criterion for review
 | Toh Yong Jie | 1105243 |
 | Lee Hongyi, Ryan | 1124535 |
 | Marvin Fong Jun Lin | 1124596 |
-| Chiw Jia Long | 1137438 |
+| Chiow Jia Long | 1137438 |
 
 ---
 
