@@ -111,7 +111,7 @@ try {
     // Give Project 1 and 2 some views/favourites
     foreach ([$pids_proj[0], $pids_proj[1]] as $pid) {
         ex('INSERT INTO project_view (project_id, customer_id) VALUES ($1, $2)', [$pid, $customerId]);
-        Favourite::saveFavourite($customerId, $pid);
+        Favourite::addFavourite($customerId, $pid);
     }
     // Leave Project 3 & 4 with 0 views/saves to test the empty metrics UI
     echo "✅ Views & Favourites injected (Projects 3 & 4 left empty for UI testing)\n";
