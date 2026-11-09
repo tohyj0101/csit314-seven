@@ -149,7 +149,7 @@ class LoginController
             $u = UserAcc::authenticate($email, $password);
             if (!$u) {
                 // --- 3. Diagnose why ---
-                $candidate = UserAcc::findByEmail($email);
+                $candidate = UserAcc::checkDuplicate($email);
                 if ($candidate && $candidate['status'] === 'Suspended') {
                     display_error(403, 'This account has been suspended. Please contact the administrator.');
                     return;
@@ -193,7 +193,7 @@ class LogoutController
     /**
      * US #2, #14, #36, #40 — Logout. Destroys session + expires cookie.
      */
-    public static function logout(): void
+    public static function LogoutUser(): void
     {
         $_SESSION = [];
         if (ini_get('session.use_cookies')) {
@@ -208,7 +208,7 @@ class LogoutController
      * Polled by app.js on every route change to rehydrate window.__user.
      * 401 here is expected and triggers the SPA to fall back to login().
      */
-    public static function me(): void
+    public static function retrieveAuthenticatedUser(): void
     {
         $u = session_user();
         if (!$u) { display_error(401, 'You are not logged in.'); return; }
@@ -226,7 +226,7 @@ class CreateUserAccController {
      *   A2 — Duplicate email → 409 (pre-check + DB unique constraint)
      *   Invalid email format → 400 with field="email"
      */
-    public static function create(): void {
+    public static function validateUserData(): void {
         try {
             $b = req_body();
             $pid = $b['profile_id'] ?? null; $username = $b['username'] ?? null;
@@ -239,11 +239,11 @@ class CreateUserAccController {
                 display_error(400, 'Please provide a valid email address.', ['field' => 'email']);
                 return;
             }
-            if (UserAcc::findByEmail($email)) {
+            if (UserAcc::checkDuplicate($email)) {
                 display_error(409, 'An account with this email already exists.', ['field' => 'email']);
                 return;
             }
-            json_out(201, ['user' => UserAcc::saveAccount([
+            json_out(201, ['user' => UserAcc::createUserAccount([
                 'profile_id'    => (int)$pid,
                 'username'      => $username,
                 'email'         => $email,
@@ -253,8 +253,8 @@ class CreateUserAccController {
     }
 }
 
-/** Current: UpdateUserAccController  |  Original teammate: updateUser_Controller */
-class UpdateUserAccController {
+/** Current: UpdateUserController  |  Original teammate: updateUser_Controller */
+class UpdateUserController {
     /**
      * US #4 — Update a user account.
      *
@@ -262,7 +262,7 @@ class UpdateUserAccController {
      * If password is empty/blank, the existing hash is kept (so the "reset
      * password" UI doesn't accidentally blank it).
      */
-    public static function update(array $params): void {
+    public static function UpdateUserAccount(array $params): void {
         try {
             $id = $params['id']; $b = req_body();
             if (!empty($b['email']) && !str_contains($b['email'], '@')) {
@@ -270,7 +270,7 @@ class UpdateUserAccController {
                 return;
             }
             if (!empty($b['email'])) {
-                $existing = UserAcc::findByEmail($b['email']);
+                $existing = UserAcc::checkDuplicate($b['email']);
                 if ($existing && (int)$existing['account_id'] !== (int)$id) {
                     display_error(409, 'An account with this email already exists.', ['field' => 'email']);
                     return;
@@ -283,18 +283,18 @@ class UpdateUserAccController {
                 unset($f['password_hash']);
             }
             unset($f['password']);   // never pass plaintext to the entity
-            $u = UserAcc::updateUser($id, $f);
+            $u = UserAcc::UpdateUserAccount($id, $f);
             if (!$u) { display_error(404, 'User account not found.'); return; }
             json_out(200, ['user' => $u]);
         } catch (Throwable $e) { handle_error($e); }
     }
 }
 
-/** Current: ViewUserAccController  |  Original teammate: viewUserAccount_Controller */
-class ViewUserAccController {
+/** Current: ViewUserAccountController  |  Original teammate: viewUserAccount_Controller */
+class ViewUserAccountController {
     /** US #5 — Read-only view of a single user account. */
-    public static function view(array $params): void {
-        $u = UserAcc::findById($params['id']);
+    public static function RetrieveUserAccount(array $params): void {
+        $u = UserAcc::RetrieveUserAccount($params['id']);
         if (!$u) { display_error(404, 'User not found.'); return; }
         json_out(200, ['user' => $u]);
     }
@@ -307,18 +307,18 @@ class SuspendUserAccController {
      * Idempotency contract: suspending an already-suspended account → 409.
      * This is intentional asymmetry with activate (which is a no-op).
      */
-    public static function suspend(array $params): void {
+    public static function suspendUserAccount(array $params): void {
         $status = UserAcc::checkActiveStatus($params['id']);
         if ($status === null) { display_error(404, 'User not found.'); return; }
         if ($status === 'Suspended') { display_error(409, 'This account is already suspended.'); return; }
-        json_out(200, ['user' => UserAcc::updateStatus($params['id'], 'Suspended')]);
+        json_out(200, ['user' => UserAcc::suspendUserAccount($params['id'], 'Suspended')]);
     }
 
     /** US #6 — Activate an account (idempotent no-op if already active). */
-    public static function activate(array $params): void {
+    public static function activateUserAccount(array $params): void {
         $status = UserAcc::checkActiveStatus($params['id']);
         if ($status === null) { display_error(404, 'User not found.'); return; }
-        json_out(200, ['user' => UserAcc::updateStatus($params['id'], 'Active')]);
+        json_out(200, ['user' => UserAcc::suspendUserAccount($params['id'], 'Active')]);
     }
 }
 
@@ -328,9 +328,9 @@ class SearchUserAccController {
      * US #7 — Search by username or email (ILIKE, case-insensitive).
      * Empty result is NOT an error — 200 with an empty array and a message.
      */
-    public static function search(): void {
+    public static function searchUserAccount(): void {
         $q = $_GET['q'] ?? '';
-        $users = UserAcc::findAccounts($q);
+        $users = UserAcc::searchUserAccount($q);
         if (count($users) === 0) {
             json_out(200, ['users' => [], 'message' => 'No users found matching the search criteria.']);
             return;
@@ -339,7 +339,7 @@ class SearchUserAccController {
     }
 
     /** US #7 — Full account list (capped at 500 in entity layer). */
-    public static function list(): void { json_out(200, ['users' => UserAcc::all()]); }
+    public static function retrieveUserAccounts(): void { json_out(200, ['users' => UserAcc::searchUserAccount('')]); }
 }
 
 /* =============================================================================
@@ -349,7 +349,7 @@ class SearchUserAccController {
 /** Current: CreateProfileController  |  Original teammate: createProfile_Controller */
 class CreateProfileController {
     /** US #8 — Create a user profile (role + permissions). Name must be unique. */
-    public static function create(): void {
+    public static function createProfile(): void {
         try {
             $b = req_body();
             if (empty($b['profile_name'])) {
@@ -366,10 +366,10 @@ class CreateProfileController {
     }
 }
 
-/** Current: EditProfileController  |  Original teammate: updateProfileController */
-class EditProfileController {
+/** Current: UpdateUserProfileController  |  Original teammate: updateProfileController */
+class UpdateUserProfileController {
     /** US #9 — Update a user profile (name + permissions). */
-    public static function update(array $params): void {
+    public static function UpdateUserProfile(array $params): void {
         try {
             $b = req_body();
             if (empty($b['profile_name'])) {
@@ -381,7 +381,7 @@ class EditProfileController {
                 display_error(409, 'A profile with this name already exists.', ['field' => 'profile_name']);
                 return;
             }
-            $p = UserProfile::saveProfileSettings($params['id'], $b);
+            $p = UserProfile::UpdateUserProfile($params['id'], $b);
             if (!$p) { display_error(404, 'The requested profile could not be found.'); return; }
             json_out(200, ['profile' => $p]);
         } catch (Throwable $e) { handle_error($e); }
@@ -391,32 +391,32 @@ class EditProfileController {
 /** Current: ViewProfileController  |  Original teammate: viewProfile_Controller */
 class ViewProfileController {
     /** US #10 — Read a single profile. */
-    public static function view(array $params): void {
-        $p = UserProfile::getProfileDetails($params['id']);
+    public static function retrieveProfile(array $params): void {
+        $p = UserProfile::retrieveProfile($params['id']);
         if (!$p) { display_error(404, 'The requested profile could not be found.'); return; }
         json_out(200, ['profile' => $p]);
     }
 }
 
-/** Current: SuspendProfileController  |  Original teammate: SuspendUserProfileController */
-class SuspendProfileController {
+/** Current: SuspendUserProfileController  |  Original teammate: SuspendUserProfileController */
+class SuspendUserProfileController {
     /**
      * US #11 — Suspend a profile.
      * Suspending a profile blocks login for EVERY account using it. LoginController
      * enforces this via the profile_status check (see authenticate()).
      */
-    public static function suspend(array $params): void {
-        $p = UserProfile::getProfileDetails($params['id']);
+    public static function suspendProfile(array $params): void {
+        $p = UserProfile::retrieveProfile($params['id']);
         if (!$p) { display_error(404, 'User profile cannot be found.'); return; }
         if ($p['status'] === 'Suspended') { display_error(409, 'User profile is already suspended.'); return; }
-        json_out(200, ['profile' => UserProfile::setStatus($params['id'], 'Suspended')]);
+        json_out(200, ['profile' => UserProfile::updateStatus($params['id'], 'Suspended')]);
     }
 
     /** US #11 — Activate a profile. */
-    public static function activate(array $params): void {
-        $p = UserProfile::getProfileDetails($params['id']);
+    public static function activateProfile(array $params): void {
+        $p = UserProfile::retrieveProfile($params['id']);
         if (!$p) { display_error(404, 'User profile cannot be found.'); return; }
-        json_out(200, ['profile' => UserProfile::setStatus($params['id'], 'Active')]);
+        json_out(200, ['profile' => UserProfile::updateStatus($params['id'], 'Active')]);
     }
 }
 
@@ -424,7 +424,7 @@ class SuspendProfileController {
 class SearchProfileController {
     /** US #12 — Search profiles by name (ILIKE). */
     public static function search(): void {
-        $results = UserProfile::searchProfiles($_GET['q'] ?? '');
+        $results = UserProfile::search($_GET['q'] ?? '');
         if (count($results) === 0) {
             json_out(200, ['profiles' => [], 'message' => 'No matching user profiles were found.']);
             return;
@@ -433,7 +433,7 @@ class SearchProfileController {
     }
 
     /** US #12 — List all profiles. */
-    public static function list(): void { json_out(200, ['profiles' => UserProfile::all()]); }
+    public static function retrieveProfiles(): void { json_out(200, ['profiles' => UserProfile::search('')]); }
 }
 
 /* =============================================================================
@@ -448,7 +448,7 @@ class CreateCompanyController {
      * Contact hotline: strip non-digits, then require exactly 8. Tolerates
      * input like "9123-4567" or "9123 4567" while rejecting malformed numbers.
      */
-    public static function create(): void {
+    public static function createCompany(): void {
         try {
             $b = req_body();
             if (empty($b['company_name'])) {
@@ -464,7 +464,7 @@ class CreateCompanyController {
                 }
                 $b['contact_no'] = $digitsOnly;
             }
-            json_out(201, ['company' => CompanyInfo::saveCompany([
+            json_out(201, ['company' => CompanyInfo::createCompany([
                 'owner_id'     => session_user()['account_id'],
                 'company_name' => $b['company_name'],
                 'address'      => $b['address'] ?? null,
@@ -477,19 +477,19 @@ class CreateCompanyController {
 /** Current: ViewCompanyController  |  Original teammate: viewCoyinfo_Controller */
 class ViewCompanyController {
     /** US #16 — Read a single company (immutable record — no side effects). */
-    public static function view(array $params): void {
-        $c = CompanyInfo::findById($params['id']);
+    public static function viewCompanyInfo(array $params): void {
+        $c = CompanyInfo::viewCompanyInfo($params['id']);
         if (!$c) { display_error(404, 'No matching results. Company information could not be found.'); return; }
         json_out(200, ['company' => $c]);
     }
 }
 
-/** Current: UpdateCompanyController  |  Original teammate: CompanyUpdateController */
-class UpdateCompanyController {
+/** Current: CompanyUpdateController  |  Original teammate: CompanyUpdateController */
+class CompanyUpdateController {
     /** US #17 — Update a company; 403 unless caller owns it. */
-    public static function update(array $params): void {
+    public static function updateCompanyInfo(array $params): void {
         try {
-            $c = CompanyInfo::findById($params['id']);
+            $c = CompanyInfo::viewCompanyInfo($params['id']);
             if (!$c) { display_error(404, 'Company record not found.'); return; }
             if ((int)$c['owner_id'] !== (int)session_user()['account_id']) {
                 display_error(403, 'You do not have permission to edit this company.');
@@ -514,8 +514,8 @@ class UpdateCompanyController {
     }
 }
 
-/** Current: DeleteCompanyController  |  Original teammate: Delete_CompanyInfo_Controller */
-class DeleteCompanyController {
+/** Current: DeleteCompanyInfoController  |  Original teammate: Delete_CompanyInfo_Controller */
+class DeleteCompanyInfoController {
     /**
      * US #18 — Delete a company.
      *
@@ -523,15 +523,15 @@ class DeleteCompanyController {
      * project.company_id is ON DELETE RESTRICT). handle_error() translates
      * that to a friendly 400. This is intentional data protection, not a bug.
      */
-    public static function remove(array $params): void {
+    public static function deleteCompany(array $params): void {
         try {
-            $c = CompanyInfo::findById($params['id']);
+            $c = CompanyInfo::viewCompanyInfo($params['id']);
             if (!$c) { display_error(404, 'Company information could not be found.'); return; }
             if ((int)$c['owner_id'] !== (int)session_user()['account_id']) {
                 display_error(403, 'You do not have permission to delete this company.');
                 return;
             }
-            CompanyInfo::removeCompany($params['id']);
+            CompanyInfo::deleteCompany($params['id']);
             json_out(200, ['ok' => true]);
         } catch (Throwable $e) {
             handle_error($e, 'Deletion failed.');
@@ -539,11 +539,11 @@ class DeleteCompanyController {
     }
 }
 
-/** Current: SearchCompanyController  |  Original teammate: searchCoyinfo_Controller */
-class SearchCompanyController {
+/** Current: SearchCompanyInfoController  |  Original teammate: searchCoyinfo_Controller */
+class SearchCompanyInfoController {
     /** US #19 — Search only the current designer's companies. */
-    public static function search(): void {
-        $rows = CompanyInfo::findCompanies(session_user()['account_id'], $_GET['q'] ?? '');
+    public static function searchCompanyInfo(): void {
+        $rows = CompanyInfo::searchCompanyInfo(session_user()['account_id'], $_GET['q'] ?? '');
         if (count($rows) === 0) {
             json_out(200, ['companies' => [], 'message' => 'No companies found matching the search keyword.']);
             return;
@@ -552,8 +552,8 @@ class SearchCompanyController {
     }
 
     /** US #19 — List all companies owned by the current designer. */
-    public static function list(): void {
-        json_out(200, ['companies' => CompanyInfo::byOwner(session_user()['account_id'])]);
+    public static function retrieveCompanies(): void {
+        json_out(200, ['companies' => CompanyInfo::retrieveCompaniesByOwner(session_user()['account_id'])]);
     }
 }
 
@@ -566,9 +566,9 @@ class SearchCompanyController {
  * ============================================================================= */
 class ProjectAuth {
     public static function assertOwner($pid, $uid): ?array {
-        $p = Project::findById($pid);
+        $p = Project::getProject($pid);
         if (!$p) { display_error(404, 'Project not found.'); return null; }
-        $c = CompanyInfo::findById($p['company_id']);
+        $c = CompanyInfo::viewCompanyInfo($p['company_id']);
         if (!$c || (int)$c['owner_id'] !== (int)$uid) {
             display_error(403, 'You do not have permission to modify this project.');
             return null;
@@ -581,8 +581,8 @@ class ProjectAuth {
  * [SECTION: PROJECT CONTROLLERS]  US #20–#31
  * ============================================================================= */
 
-/** Current: CreateProjectController  |  Original teammate: projCreationController */
-class CreateProjectController {
+/** Current: ProjectCreationController  |  Original teammate: projCreationController */
+class ProjectCreationController {
     /**
      * US #20 — Create an ongoing (or user-specified status) project.
      *
@@ -590,10 +590,10 @@ class CreateProjectController {
      *   1. company_id must belong to the current designer (403 otherwise).
      *   2. title + description must be non-empty (400 otherwise).
      */
-    public static function create(): void {
+    public static function createProject(): void {
         try {
             $b = req_body();
-            $c = CompanyInfo::findById($b['company_id'] ?? null);
+            $c = CompanyInfo::viewCompanyInfo($b['company_id'] ?? null);
             if (!$c || (int)$c['owner_id'] !== (int)session_user()['account_id']) {
                 display_error(403, 'Invalid company selected or you do not own it.', ['field' => 'company_id']);
                 return;
@@ -602,7 +602,7 @@ class CreateProjectController {
                 display_error(400, 'Please fill up all fields: Title and Description.');
                 return;
             }
-            json_out(201, ['project' => Project::saveProject([
+            json_out(201, ['project' => Project::createProject([
                 'company_id'  => (int)$b['company_id'],
                 'title'       => $b['title'],
                 'description' => $b['description'],
@@ -616,13 +616,13 @@ class CreateProjectController {
 class CreateCompletedProjController {
     /**
      * US #25 — Create a COMPLETED project.
-     * Same shape as CreateProjectController but forces status='Completed'.
+     * Same shape as ProjectCreationController but forces status='Completed'.
      * Separate endpoint so the "Create Completed Project" form is self-describing.
      */
-    public static function create(): void {
+    public static function createProject(): void {
         try {
             $b = req_body();
-            $c = CompanyInfo::findById($b['company_id'] ?? null);
+            $c = CompanyInfo::viewCompanyInfo($b['company_id'] ?? null);
             if (!$c || (int)$c['owner_id'] !== (int)session_user()['account_id']) {
                 display_error(403, 'Invalid company selected.', ['field' => 'company_id']);
                 return;
@@ -631,7 +631,7 @@ class CreateCompletedProjController {
                 display_error(400, 'Please fill up all fields: Title and Description.');
                 return;
             }
-            json_out(201, ['project' => Project::saveProject([
+            json_out(201, ['project' => Project::createProject([
                 'company_id'  => (int)$b['company_id'],
                 'title'       => $b['title'],
                 'description' => $b['description'],
@@ -644,20 +644,20 @@ class CreateCompletedProjController {
 /** Current: ViewProjectController  |  Original teammate: viewProjectController */
 class ViewProjectController {
     /** US #21 — Read a single project by id. */
-    public static function view(array $params): void {
-        $p = Project::findById($params['id']);
+    public static function getProject(array $params): void {
+        $p = Project::getProject($params['id']);
         if (!$p) { display_error(404, 'Project not found.'); return; }
         json_out(200, ['project' => $p]);
     }
 
     /** US #21 — List all projects for a company, optional ?status= filter. */
-    public static function listByCompany(array $params): void {
-        $c = CompanyInfo::findById($params['companyId']);
+    public static function getProjectsByCompany(array $params): void {
+        $c = CompanyInfo::viewCompanyInfo($params['companyId']);
         if (!$c || (int)$c['owner_id'] !== (int)session_user()['account_id']) {
             display_error(403, 'You do not have permission.');
             return;
         }
-        $rows = Project::byCompany($params['companyId'], $_GET['status'] ?? null);
+        $rows = Project::getProjectsByCompany($params['companyId'], $_GET['status'] ?? null);
         if (count($rows) === 0) {
             json_out(200, ['projects' => [], 'message' => 'No projects exist for this company.']);
             return;
@@ -672,8 +672,8 @@ class ViewCompletedProjController {
      * US #26 — Read a completed project.
      * Returns 404 if the project exists but is not Completed (stale UI defence).
      */
-    public static function view(array $params): void {
-        $p = Project::findById($params['id']);
+    public static function retrieveCompletedProject(array $params): void {
+        $p = Project::retrieveCompletedProject($params['id']);
         if (!$p || ($p['status'] ?? null) !== 'Completed') {
             display_error(404, 'Completed project not found.');
             return;
@@ -685,7 +685,7 @@ class ViewCompletedProjController {
 /** Current: UpdateProjectController  |  Original teammate: updateProject_Controller */
 class UpdateProjectController {
     /** US #22 — Update a project. Ownership enforced via ProjectAuth. */
-    public static function update(array $params): void {
+    public static function updateProject(array $params): void {
         try {
             if (!ProjectAuth::assertOwner($params['id'], session_user()['account_id'])) return;
             $b = req_body();
@@ -696,7 +696,7 @@ class UpdateProjectController {
             }
             // If moving to a different company, that company must also be owned.
             if (!empty($b['company_id'])) {
-                $nc = CompanyInfo::findById((int)$b['company_id']);
+                $nc = CompanyInfo::viewCompanyInfo((int)$b['company_id']);
                 if (!$nc || (int)$nc['owner_id'] !== (int)session_user()['account_id']) {
                     display_error(403, 'You do not own the selected company.', ['field' => 'company_id']);
                     return;
@@ -716,7 +716,7 @@ class UpdateProjectController {
 /** Current: UpdateCompletedProjController  |  Original teammate: updateCompletedProj_Controller */
 class UpdateCompletedProjController {
     /** US #27 — Update a completed project. Same flow as UpdateProjectController. */
-    public static function update(array $params): void {
+    public static function updateProject(array $params): void {
         try {
             if (!ProjectAuth::assertOwner($params['id'], session_user()['account_id'])) return;
             $b = req_body();
@@ -725,7 +725,7 @@ class UpdateCompletedProjController {
                 return;
             }
             if (!empty($b['company_id'])) {
-                $nc = CompanyInfo::findById((int)$b['company_id']);
+                $nc = CompanyInfo::viewCompanyInfo((int)$b['company_id']);
                 if (!$nc || (int)$nc['owner_id'] !== (int)session_user()['account_id']) {
                     display_error(403, 'You do not own the selected company.', ['field' => 'company_id']);
                     return;
@@ -747,7 +747,7 @@ class DeleteProjectController {
      * US #23 — Delete an ongoing project. Cascade removes project_view and
      * favourite rows (schema-level ON DELETE CASCADE).
      */
-    public static function remove(array $params): void {
+    public static function deleteProject(array $params): void {
         try {
             if (!ProjectAuth::assertOwner($params['id'], session_user()['account_id'])) return;
             Project::deleteProject($params['id']);
@@ -756,17 +756,8 @@ class DeleteProjectController {
     }
 }
 
-/** Current: DeleteCompletedProjController  |  Original teammate: deleteProj_controller */
-class DeleteCompletedProjController {
-    /** US #28 — Delete a completed project. Same flow as DeleteProjectController. */
-    public static function remove(array $params): void {
-        try {
-            if (!ProjectAuth::assertOwner($params['id'], session_user()['account_id'])) return;
-            Project::deleteProject($params['id']);
-            json_out(200, ['ok' => true]);
-        } catch (Throwable $e) { handle_error($e); }
-    }
-}
+/** Current: DeleteProjectController  |  Original teammate: deleteProj_controller */
+
 
 /** Current: SearchProjectController  |  Original teammate: SearchProjectController */
 class SearchProjectController {
@@ -775,13 +766,13 @@ class SearchProjectController {
      * Ownership guard runs BEFORE search so a caller can't fingerprint other
      * companies by watching for "no results" vs "forbidden".
      */
-    public static function search(array $params): void {
-        $c = CompanyInfo::findById($params['companyId']);
+    public static function SearchProject(array $params): void {
+        $c = CompanyInfo::viewCompanyInfo($params['companyId']);
         if (!$c || (int)$c['owner_id'] !== (int)session_user()['account_id']) {
             display_error(403, 'You do not have permission.');
             return;
         }
-        $rows = Project::searchProject($params['companyId'], $_GET['q'] ?? '', $_GET['status'] ?? null);
+        $rows = Project::SearchProject($params['companyId'], $_GET['q'] ?? '', $_GET['status'] ?? null);
         if (count($rows) === 0) {
             json_out(200, ['projects' => [], 'message' => 'No matching projects were found.']);
             return;
@@ -790,8 +781,8 @@ class SearchProjectController {
     }
 }
 
-/** Current: SearchCompletedController  |  Original teammate: SearchCompeletedController */
-class SearchCompletedController {
+/** Current: SearchCompeletedController  |  Original teammate: SearchCompeletedController */
+class SearchCompeletedController {
     /**
      * US #29 — Search completed projects within a company.
      * Same as SearchProjectController but hardcodes status='Completed'.
@@ -800,13 +791,13 @@ class SearchCompletedController {
      * historical misspelling "SearchCompeletedController" (Compeleted instead
      * of Completed) — kept as-is for git/report traceability.
      */
-    public static function search(array $params): void {
-        $c = CompanyInfo::findById($params['companyId']);
+    public static function SearchProject(array $params): void {
+        $c = CompanyInfo::viewCompanyInfo($params['companyId']);
         if (!$c || (int)$c['owner_id'] !== (int)session_user()['account_id']) {
             display_error(403, 'You do not have permission.');
             return;
         }
-        $rows = Project::searchProject($params['companyId'], $_GET['q'] ?? '', 'Completed');
+        $rows = Project::SearchProject($params['companyId'], $_GET['q'] ?? '', 'Completed');
         if (count($rows) === 0) {
             json_out(200, ['projects' => [], 'message' => 'No matching completed projects were found.']);
             return;
@@ -830,8 +821,8 @@ class SearchAllInterestController {
      *
      * This is the endpoint exercised by test_37_view_project_views().
      */
-    public static function search(): void {
-        json_out(200, ['interest' => Project::interestAllByOwner(session_user()['account_id'])]);
+    public static function getProjectDetails(): void {
+        json_out(200, ['interest' => Project::getAllProjectDetails(session_user()['account_id'])]);
     }
 }
 
@@ -841,8 +832,8 @@ class SearchPublicProjectController {
      * US #30 — Public project search (Customer Discovery Gallery).
      * No ownership scoping — searches across all designers' projects.
      */
-    public static function search(): void {
-        $rows = Project::publicSearch($_GET['q'] ?? '');
+    public static function searchPublicProject(): void {
+        $rows = Project::searchPublicProject($_GET['q'] ?? '');
         if (count($rows) === 0) {
             json_out(200, ['projects' => [], 'message' => 'No matching projects were found.']);
             return;
@@ -860,9 +851,9 @@ class ViewPublicProjectController {
      * the designer-facing analytics counters (US #37, #38). It is intentionally
      * the ONLY write path triggered by a Customer browsing action.
      */
-    public static function view(array $params): void {
+    public static function retrieveProject(array $params): void {
         try {
-            $p = Project::findById($params['id']);
+            $p = Project::retrieveProject($params['id']);
             if (!$p) { display_error(404, 'This project is no longer available.'); return; }
             Project::recordView($p['project_id'], session_user()['account_id'] ?? null);
             json_out(200, ['project' => $p]);
@@ -880,13 +871,13 @@ class ProjectInterestController {
      * US #37, #38 (per-company) — Aggregated views + shortlists for one
      * company's projects. Returns COUNTS ONLY.
      */
-    public static function interest(array $params): void {
-        $c = CompanyInfo::findById($params['companyId']);
+    public static function getProjectDetails(array $params): void {
+        $c = CompanyInfo::viewCompanyInfo($params['companyId']);
         if (!$c || (int)$c['owner_id'] !== (int)session_user()['account_id']) {
             display_error(403, 'You do not have permission.');
             return;
         }
-        json_out(200, ['interest' => Project::interest($params['companyId'])]);
+        json_out(200, ['interest' => Project::getProjectDetails($params['companyId'])]);
     }
 }
 
@@ -896,27 +887,27 @@ class FavouriteController {
      * US #32 — Save a project to favourites. Idempotent (entity uses
      * ON CONFLICT DO NOTHING) so double-clicking "Save" doesn't error.
      */
-    public static function add(): void {
+    public static function saveFavourite(): void {
         try {
             $b  = req_body(); $pid = $b['project_id'] ?? null;
             if (!$pid) { display_error(400, 'No project selected to save.', ['field' => 'project_id']); return; }
-            if (!Project::findById($pid)) {
+            if (!Project::getProject($pid)) {
                 display_error(404, 'The project could not be added because it does not exist.');
                 return;
             }
-            Favourite::saveFavourite(session_user()['account_id'], (int)$pid);
+            Favourite::addFavourite(session_user()['account_id'], (int)$pid);
             json_out(201, ['ok' => true]);
         } catch (Throwable $e) { handle_error($e, 'The project could not be added.'); }
     }
 
     /** US #34 — List the current customer's saved projects. */
-    public static function list(): void {
-        json_out(200, ['favourites' => Favourite::viewFavourites(session_user()['account_id'])]);
+    public static function getProjectsByCustomerId(): void {
+        json_out(200, ['favourites' => Favourite::getProjectsByCustomerId(session_user()['account_id'])]);
     }
 
     /** US #33 — Search within the current customer's favourites. */
-    public static function search(): void {
-        $rows = Favourite::searchFavourites(session_user()['account_id'], $_GET['q'] ?? '');
+    public static function searchFavourite(): void {
+        $rows = Favourite::searchFavourite(session_user()['account_id'], $_GET['q'] ?? '');
         if (count($rows) === 0) {
             json_out(200, ['favourites' => [], 'message' => 'No matching interior design projects found in your favourite list.']);
             return;
@@ -925,7 +916,7 @@ class FavouriteController {
     }
 
     /** US #34 — Remove a project from the current customer's favourites. */
-    public static function remove(array $params): void {
+    public static function deleteFavourite(array $params): void {
         Favourite::removeFavourite(session_user()['account_id'], $params['projectId']);
         json_out(200, ['ok' => true]);
     }
@@ -937,7 +928,7 @@ class SearchAllProjectsController {
      * Cross-company project search scoped to the current designer.
      * Distinct from SearchPublicProjectController (which is customer-facing).
      */
-    public static function search(): void {
+    public static function searchFavourite(): void {
         $q = $_GET['q'] ?? '';
         $status = $_GET['status'] ?? null;
         $rows = Project::searchAllByOwner(session_user()['account_id'], $q, $status);
@@ -956,8 +947,8 @@ class ViewFavouritesController {
      * FavouriteController::list(), but retained because earlier client builds
      * referenced it directly. Safe to remove once no external clients depend on it.
      */
-    public static function list(): void {
-        json_out(200, ['favourites' => Favourite::viewFavourites(session_user()['account_id'])]);
+    public static function getProjectsByCustomerId(): void {
+        json_out(200, ['favourites' => Favourite::getProjectsByCustomerId(session_user()['account_id'])]);
     }
 }
 
@@ -968,7 +959,7 @@ class ViewFavouritesController {
 /** Current: CreateCategoryController  |  Original teammate: CreateCategoryController */
 class CreateCategoryController {
     /** US #41 — Create a category. Name must be unique. */
-    public static function create(): void {
+    public static function submitCategory(): void {
         try {
             $b = req_body();
             if (empty($b['category_name'])) {
@@ -988,7 +979,7 @@ class CreateCategoryController {
 /** Current: ViewCategoryController  |  Original teammate: ViewCategoryController */
 class ViewCategoryController {
     /** US #42 — List all categories (alphabetised). */
-    public static function list(): void {
+    public static function getCategories(): void {
         $rows = Category::retrieveCategories();
         if (count($rows) === 0) {
             json_out(200, ['categories' => [], 'message' => 'No IDP categories are available.']);
@@ -998,7 +989,7 @@ class ViewCategoryController {
     }
 
     /** US #42 — Read a single category. */
-    public static function view(array $params): void {
+    public static function retrieveCategory(array $params): void {
         $c = Category::viewCategory($params['id']);
         if (!$c) { display_error(404, 'Category not found.'); return; }
         json_out(200, ['category' => $c]);
@@ -1008,7 +999,7 @@ class ViewCategoryController {
 /** Current: UpdateCategoryController  |  Original teammate: UpdateCategoryController */
 class UpdateCategoryController {
     /** US #43 — Update a category (name + description). */
-    public static function update(array $params): void {
+    public static function updateCategory(array $params): void {
         try {
             if (empty(req_body()['category_name'])) {
                 display_error(400, 'Category Name cannot be empty.', ['field' => 'category_name']);
@@ -1027,7 +1018,7 @@ class UpdateCategoryController {
 /** Current: DeleteCategoryController  |  Original teammate: DeleteCategoryController */
 class DeleteCategoryController {
     /** US #44 — Delete a category. Cascade at DB level removes project_category links. */
-    public static function remove(array $params): void {
+    public static function deleteCategory(array $params): void {
         try {
             if (!Category::exists($params['id'])) {
                 display_error(404, 'The category could not be deleted because it was not found.');
@@ -1042,7 +1033,7 @@ class DeleteCategoryController {
 /** Current: SearchCategoryController  |  Original teammate: SearchCategoryController */
 class SearchCategoryController {
     /** US #45 — Search categories by name (ILIKE). */
-    public static function search(): void {
+    public static function searchCategory(): void {
         $rows = Category::findCategory($_GET['q'] ?? '');
         if (count($rows) === 0) {
             json_out(200, ['categories' => [], 'message' => 'No matching categories were found.']);
@@ -1056,29 +1047,29 @@ class SearchCategoryController {
  * [SECTION: REPORT CONTROLLERS]  US #46–#48 (Platform Manager only)
  * =============================================================================
  * Split from the original single ReportController. Each class delegates to
- * Report::generate($period) — the only difference is the time window.
+ * Report BCE report operation — the only difference is the time window.
  * ============================================================================= */
 
 /** Current: DailyReportController  |  Original teammate: DailyReportController */
 class DailyReportController {
     /** US #46 — Daily report (rolling 24 hours). */
-    public static function generate(array $params = []): void {
-        json_out(200, Report::generate('daily'));
+    public static function generateDailyReport(array $params = []): void {
+        json_out(200, Report::generateDailyReport());
     }
 }
 
 /** Current: WeeklyReportController  |  Original teammate: WeeklyReportController */
 class WeeklyReportController {
     /** US #47 — Weekly report (rolling 7 days). */
-    public static function generate(array $params = []): void {
-        json_out(200, Report::generate('weekly'));
+    public static function generateWeeklyReport(array $params = []): void {
+        json_out(200, Report::generateWeeklyReport());
     }
 }
 
 /** Current: MonthlyReportController  |  Original teammate: MonthlyReportController */
 class MonthlyReportController {
     /** US #48 — Monthly report (rolling 30 days). */
-    public static function generate(array $params = []): void {
-        json_out(200, Report::generate('monthly'));
+    public static function generateMonthlyReport(array $params = []): void {
+        json_out(200, Report::generateMonthlyReport());
     }
 }
