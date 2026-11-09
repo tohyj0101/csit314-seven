@@ -33,7 +33,7 @@ declare(strict_types=1);
 class UserAcc
 {
     /** US #5 — Read a single account joined with its profile. */
-    public static function findById($id): ?array
+    public static function RetrieveUserAccount($id): ?array
     {
         return q1(
             'SELECT a.account_id, a.username, a.email, a.status, a.profile_id, p.profile_name, p.permissions
@@ -48,7 +48,7 @@ class UserAcc
      * differentiate 401 from 403 (profile_status tells "account suspended"
      * apart from "profile suspended").
      */
-    public static function findByEmail(string $e): ?array
+    public static function checkDuplicate(string $e): ?array
     {
         return q1(
             'SELECT a.*, p.profile_name, p.permissions, p.status AS profile_status
@@ -67,7 +67,7 @@ class UserAcc
      */
     public static function authenticate(string $email, string $pw): ?array
     {
-        $u = self::findByEmail($email);
+        $u = self::checkDuplicate($email);
         if (!$u) return null;
         if ($u['status'] === 'Suspended') return null;
         if (isset($u['profile_status']) && $u['profile_status'] === 'Suspended') return null;
@@ -76,7 +76,7 @@ class UserAcc
     }
 
     /** US #3 — Insert a new account (password already hashed by the controller). */
-    public static function saveAccount(array $f): array
+    public static function createUserAccount(array $f): array
     {
         return q1(
             'INSERT INTO user_account (profile_id, username, email, password_hash)
@@ -90,7 +90,7 @@ class UserAcc
      * the caller provided one (UpdateUserAccController unsets the key when the
      * password field is blank).
      */
-    public static function updateUser($id, array $f): ?array
+    public static function UpdateUserAccount($id, array $f): ?array
     {
         return q1(
             'UPDATE user_account SET
@@ -113,7 +113,7 @@ class UserAcc
     }
 
     /** US #6 — Toggle account status. */
-    public static function updateStatus($id, string $s): ?array
+    public static function suspendUserAccount($id, string $s = 'Suspended'): ?array
     {
         return q1(
             'UPDATE user_account SET status=$2, updated_at=now()
@@ -124,7 +124,7 @@ class UserAcc
     }
 
     /** US #7 — Search by username OR email (case-insensitive ILIKE, contains). */
-    public static function findAccounts(string $t): array
+    public static function searchUserAccount(string $t): array
     {
         return q(
             'SELECT a.account_id, a.username, a.email, a.status, p.profile_name
@@ -179,7 +179,7 @@ class UserProfile
      * the request, so the admin can rename a profile without clearing its
      * permission set.
      */
-    public static function saveProfileSettings($id, array $f): ?array
+    public static function UpdateUserProfile($id, array $f): ?array
     {
         $perms = isset($f['permissions']) ? '{' . implode(',', $f['permissions']) . '}' : null;
         return q1(
@@ -192,19 +192,19 @@ class UserProfile
     }
 
     /** US #10 — Single profile detail. */
-    public static function getProfileDetails($id): ?array
+    public static function retrieveProfile($id): ?array
     {
         return q1('SELECT * FROM user_profile WHERE profile_id = $1', [$id]);
     }
 
     /** US #11 — Toggle profile status (suspended profile blocks all its accounts). */
-    public static function setStatus($id, string $s): ?array
+    public static function updateStatus($id, string $s = 'Suspended'): ?array
     {
         return q1('UPDATE user_profile SET status=$2 WHERE profile_id=$1 RETURNING *', [$id, $s]);
     }
 
     /** US #12 — Case-insensitive name search. */
-    public static function searchProfiles(string $t): array
+    public static function search(string $t): array
     {
         return q('SELECT * FROM user_profile WHERE profile_name ILIKE $1 ORDER BY profile_id', ['%' . $t . '%']);
     }
@@ -227,7 +227,7 @@ class UserProfile
 class CompanyInfo
 {
     /** US #15 — Insert a company owned by the given account. */
-    public static function saveCompany(array $f): array
+    public static function createCompany(array $f): array
     {
         return q1(
             'INSERT INTO company (owner_id, company_name, address, contact_no)
@@ -242,13 +242,13 @@ class CompanyInfo
     }
 
     /** US #16 (list) — All companies owned by this account. */
-    public static function byOwner($id): array
+    public static function retrieveCompaniesByOwner($id): array
     {
         return q('SELECT * FROM company WHERE owner_id=$1 ORDER BY company_id DESC', [$id]);
     }
 
     /** US #16 — Read one company by id (owner check in controller). */
-    public static function findById($id): ?array
+    public static function viewCompanyInfo($id): ?array
     {
         return q1('SELECT * FROM company WHERE company_id=$1', [$id]);
     }
@@ -278,13 +278,13 @@ class CompanyInfo
      * project.company_id is ON DELETE RESTRICT). handle_error() translates
      * that to a friendly 400. This is intentional data protection.
      */
-    public static function removeCompany($id): void
+    public static function deleteCompany($id): void
     {
         ex('DELETE FROM company WHERE company_id=$1', [$id]);
     }
 
     /** US #19 — Search the current owner's companies by name or address. */
-    public static function findCompanies($oid, string $t): array
+    public static function searchCompanyInfo($oid, string $t): array
     {
         return q(
             'SELECT * FROM company
@@ -304,7 +304,7 @@ class CompanyInfo
 class Project
 {
     /** US #20 / #25 — Insert a project; `status` chosen by caller. */
-    public static function saveProject(array $f): array
+    public static function createProject(array $f): array
     {
         return q1(
             'INSERT INTO project (company_id, title, description, status)
@@ -319,7 +319,7 @@ class Project
     }
 
     /** US #21 / #26 / #31 — Read one project by id. */
-    public static function findById($id): ?array
+    public static function getProject($id): ?array
     {
         return q1('SELECT * FROM project WHERE project_id=$1', [$id]);
     }
@@ -330,7 +330,7 @@ class Project
      * (pass null) and "only one status" (pass 'Ongoing'/'Completed') with a
      * single query. The ::text cast prevents Postgres type-inference errors.
      */
-    public static function byCompany($cid, $s = null): array
+    public static function getProjectsByCompany($cid, $s = null): array
     {
         return q(
             'SELECT * FROM project
@@ -338,6 +338,18 @@ class Project
               ORDER BY project_id DESC',
             [$cid, $s]
         );
+    }
+
+    /** US #26 — Retrieve a completed project exactly as shown in the BCE. */
+    public static function retrieveCompletedProject($id): ?array
+    {
+        return q1("SELECT * FROM project WHERE project_id=$1 AND status='Completed'", [$id]);
+    }
+
+    /** US #33 — Retrieve a public project exactly as shown in the BCE. */
+    public static function retrieveProject($id): ?array
+    {
+        return q1('SELECT * FROM project WHERE project_id=$1', [$id]);
     }
 
     /** US #22 / #27 — Partial update via COALESCE. */
@@ -371,7 +383,7 @@ class Project
      * US #24 / #29 — Search within a company (title OR description ILIKE,
      * optional status filter).
      */
-    public static function searchProject($cid, string $t, $s = null): array
+    public static function SearchProject($cid, string $t, $s = null): array
     {
         return q(
             'SELECT * FROM project
@@ -384,7 +396,7 @@ class Project
     }
 
     /** US #30 — Public search across ALL projects; includes company_name. */
-    public static function publicSearch(string $t): array
+    public static function searchPublicProject(string $t): array
     {
         return q(
             'SELECT p.*, c.company_name
@@ -413,7 +425,7 @@ class Project
      * views AND many favourites. The ::int cast normalises the bigint returned
      * by COUNT() so JSON serialisation is consistent.
      */
-    public static function interest($cid): array
+    public static function getProjectDetails($cid): array
     {
         return q(
             'SELECT p.project_id, p.title,
@@ -456,7 +468,7 @@ class Project
      * the designer owns. This is the endpoint the report's TDD example (p.189)
      * references via GET /api/projects/search/interest.
      */
-    public static function interestAllByOwner($ownerId): array
+    public static function getAllProjectDetails($ownerId): array
     {
         return q(
             'SELECT p.project_id, p.title,
@@ -490,13 +502,13 @@ class Favourite
      * UNIQUE(customer_id, project_id) constraint on the table is what makes
      * the ON CONFLICT clause valid.
      */
-    public static function saveFavourite($cid, $pid): void
+    public static function addFavourite($cid, $pid): void
     {
         ex('INSERT INTO favourite (customer_id, project_id) VALUES ($1,$2) ON CONFLICT DO NOTHING', [$cid, $pid]);
     }
 
     /** US #34 — List a customer's saved projects, newest first. */
-    public static function viewFavourites($cid): array
+    public static function getProjectsByCustomerId($cid): array
     {
         return q(
             'SELECT f.favourite_id, p.project_id, p.title, p.description, p.status, f.saved_at
@@ -507,7 +519,7 @@ class Favourite
     }
 
     /** US #33 — Search within the customer's own favourites. */
-    public static function searchFavourites($cid, string $t): array
+    public static function searchFavourite($cid, string $t): array
     {
         return q(
             'SELECT f.favourite_id, p.project_id, p.title, p.description, p.status, f.saved_at
@@ -603,7 +615,22 @@ class Report
      * project with 3 views and 2 saves produces 3*2=6 rows via the LEFT JOIN
      * cross-product, inflating both counts.
      */
-    public static function generate(string $period): array
+    public static function generateDailyReport(): array
+    {
+        return self::generateReport('daily');
+    }
+
+    public static function generateWeeklyReport(): array
+    {
+        return self::generateReport('weekly');
+    }
+
+    public static function generateMonthlyReport(): array
+    {
+        return self::generateReport('monthly');
+    }
+
+    private static function generateReport(string $period): array
     {
         // --- 1. Translate period to a Postgres INTERVAL literal ---
         $interval = match($period) {
