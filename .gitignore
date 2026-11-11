@@ -6,3 +6,5 @@ composer-setup.php
 cloudflared.exe
 demo.ps1
 full-demo.mp4
+# Local demo runner — not shared in repo
+setup.ps1
