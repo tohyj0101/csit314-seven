@@ -12,7 +12,7 @@ $auth = auth_guard();
 $r->post('/auth/login', [], fn() => LoginController::login());
 $r->post('/auth/logout', [], fn() => LogoutController::LogoutUser());
 $r->get('/auth/me', [], fn() => LogoutController::retrieveAuthenticatedUser());
-
+/** Admin */
 $r->get('/profiles', [$auth, $A], fn() => SearchProfileController::retrieveProfiles());
 $r->get('/profiles/search', [$auth, $A], fn() => SearchProfileController::search());
 $r->post('/profiles', [$auth, $A], fn() => CreateProfileController::createProfile());
@@ -28,7 +28,7 @@ $r->get('/users/:id', [$auth, $A], fn($p) => ViewUserAccountController::Retrieve
 $r->put('/users/:id', [$auth, $A], fn($p) => UpdateUserController::UpdateUserAccount($p));
 $r->patch('/users/:id/suspend', [$auth, $A], fn($p) => SuspendUserAccController::suspendUserAccount($p));
 $r->patch('/users/:id/activate', [$auth, $A], fn($p) => SuspendUserAccController::activateUserAccount($p));
-
+/**Designer */
 $r->get('/companies', [$auth, $D], fn() => SearchCompanyInfoController::retrieveCompanies());
 $r->get('/companies/search', [$auth, $D], fn() => SearchCompanyInfoController::searchCompanyInfo());
 $r->post('/companies', [$auth, $D], fn() => CreateCompanyController::createCompany());
@@ -48,7 +48,7 @@ $r->put('/projects/:id', [$auth, $D], fn($p) => UpdateProjectController::updateP
 $r->put('/projects/:id/completed', [$auth, $D], fn($p) => UpdateCompletedProjController::updateProject($p));
 $r->delete('/projects/:id', [$auth, $D], fn($p) => DeleteProjectController::deleteProject($p));
 $r->delete('/projects/:id/completed', [$auth, $D], fn($p) => DeleteProjectController::deleteProject($p));
-
+/**Customer */
 $r->get('/favourites', [$auth, $Cu], fn() => ViewFavouritesController::getProjectsByCustomerId());
 $r->get('/favourites/search', [$auth, $Cu], fn() => FavouriteController::searchFavourite());
 $r->post('/favourites', [$auth, $Cu], fn() => FavouriteController::saveFavourite());
@@ -58,14 +58,14 @@ $r->get('/projects/public/:id', [$auth, $Cu], fn($p) => ViewPublicProjectControl
 
 $r->get('/projects/search/interest', [$auth, $D], fn() => SearchAllInterestController::getProjectDetails());
 $r->get('/projects/company/:companyId/interest', [$auth, $D], fn($p) => ProjectInterestController::getProjectDetails($p));
-
+/**Manager*/
 $r->get('/categories', [$auth, $M], fn() => ViewCategoryController::getCategories());
 $r->get('/categories/search', [$auth, $M], fn() => SearchCategoryController::searchCategory());
 $r->post('/categories', [$auth, $M], fn() => CreateCategoryController::submitCategory());
 $r->get('/categories/:id', [$auth, $M], fn($p) => ViewCategoryController::retrieveCategory($p));
 $r->put('/categories/:id', [$auth, $M], fn($p) => UpdateCategoryController::updateCategory($p));
 $r->delete('/categories/:id', [$auth, $M], fn($p) => DeleteCategoryController::deleteCategory($p));
-
+/**Manager Report Generation */
 $r->get('/reports/:type', [$auth, $M], function (array $p) {
     $type = strtolower((string)($p['type'] ?? ''));
     switch ($type) {

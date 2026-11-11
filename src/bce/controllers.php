@@ -13,23 +13,10 @@ declare(strict_types=1);
  *   5. Emit a JSON response (json_out) or an error (display_error).
  *
  * =============================================================================
- * ORIGINAL-TEAMMATE CONTROLLER NAME PRESERVATION
- * =============================================================================
- * Every controller class below begins with a one-line marker of the form:
- *
- *   // Current: <ThisClassName>  |  Original teammate: <OriginalClassName> 
- *
- * Rationale: The original Sprint 0/1 design (per the report's BCE diagrams and
- * UML class names, e.g. "LoginController", "createCompletedProj_Controller")
- * used slightly different class names. During the Sprint 3 refactor these were
- * consolidated, but preserving the original teammate class name in the header
- * keeps the codebase traceable back to the report's BCE diagrams and to the
- * Taiga board history. Use the marker to reconcile any diagram discrepancy.
- *
+ * 
  * =============================================================================
  * DEMO TIP
  * =============================================================================
- * grep for "Original teammate:" to list every renamed controller.
  * grep for "US #" to jump to the user story you want to demonstrate.
  * =============================================================================
  */
@@ -114,7 +101,6 @@ function handle_error(Throwable $e, string $fallback = 'An unexpected system err
  * [SECTION: USER ACCOUNT CONTROLLERS]  US #1–#7
  * ============================================================================= */
 
-/** Current: LoginController  |  Original teammate: LoginController */
 class LoginController
 {
     /**
@@ -148,7 +134,7 @@ class LoginController
             // --- 2. Credentials check ---
             $u = UserAcc::authenticate($email, $password);
             if (!$u) {
-                // --- 3. Diagnose why ---
+                // --- 3. Error checks ---
                 $candidate = UserAcc::checkDuplicate($email);
                 if ($candidate && $candidate['status'] === 'Suspended') {
                     display_error(403, 'This account has been suspended. Please contact the administrator.');
@@ -187,7 +173,6 @@ class LoginController
     }
 }
 
-/** Current: LogoutController  |  Original teammate: Logout_Controller */
 class LogoutController
 {
     /**
@@ -216,7 +201,6 @@ class LogoutController
     }
 }
 
-/** Current: CreateUserAccController  |  Original teammate: Create_UserAcc_Controller */
 class CreateUserAccController {
     /**
      * US #3 — Create a user account.
@@ -253,7 +237,6 @@ class CreateUserAccController {
     }
 }
 
-/** Current: UpdateUserController  |  Original teammate: updateUser_Controller */
 class UpdateUserController {
     /**
      * US #4 — Update a user account.
@@ -290,7 +273,6 @@ class UpdateUserController {
     }
 }
 
-/** Current: ViewUserAccountController  |  Original teammate: viewUserAccount_Controller */
 class ViewUserAccountController {
     /** US #5 — Read-only view of a single user account. */
     public static function RetrieveUserAccount(array $params): void {
@@ -300,7 +282,6 @@ class ViewUserAccountController {
     }
 }
 
-/** Current: SuspendUserAccController  |  Original teammate: SuspendUser_Controller */
 class SuspendUserAccController {
     /**
      * US #6 — Suspend an account.
@@ -322,7 +303,6 @@ class SuspendUserAccController {
     }
 }
 
-/** Current: SearchUserAccController  |  Original teammate: SearchUser_Controller */
 class SearchUserAccController {
     /**
      * US #7 — Search by username or email (ILIKE, case-insensitive).
@@ -346,7 +326,6 @@ class SearchUserAccController {
  * [SECTION: USER PROFILE CONTROLLERS]  US #8–#12
  * ============================================================================= */
 
-/** Current: CreateProfileController  |  Original teammate: createProfile_Controller */
 class CreateProfileController {
     /** US #8 — Create a user profile (role + permissions). Name must be unique. */
     public static function createProfile(): void {
@@ -366,7 +345,6 @@ class CreateProfileController {
     }
 }
 
-/** Current: UpdateUserProfileController  |  Original teammate: updateProfileController */
 class UpdateUserProfileController {
     /** US #9 — Update a user profile (name + permissions). */
     public static function UpdateUserProfile(array $params): void {
@@ -388,7 +366,6 @@ class UpdateUserProfileController {
     }
 }
 
-/** Current: ViewProfileController  |  Original teammate: viewProfile_Controller */
 class ViewProfileController {
     /** US #10 — Read a single profile. */
     public static function retrieveProfile(array $params): void {
@@ -398,7 +375,6 @@ class ViewProfileController {
     }
 }
 
-/** Current: SuspendUserProfileController  |  Original teammate: SuspendUserProfileController */
 class SuspendUserProfileController {
     /**
      * US #11 — Suspend a profile.
@@ -420,7 +396,6 @@ class SuspendUserProfileController {
     }
 }
 
-/** Current: SearchProfileController  |  Original teammate: SearchProfileController */
 class SearchProfileController {
     /** US #12 — Search profiles by name (ILIKE). */
     public static function search(): void {
@@ -440,7 +415,6 @@ class SearchProfileController {
  * [SECTION: COMPANY CONTROLLERS]  US #15–#19
  * ============================================================================= */
 
-/** Current: CreateCompanyController  |  Original teammate: IDCreate_Cl_Controller */
 class CreateCompanyController {
     /**
      * US #15 — Create a company owned by the current designer.
@@ -474,7 +448,6 @@ class CreateCompanyController {
     }
 }
 
-/** Current: ViewCompanyController  |  Original teammate: viewCoyinfo_Controller */
 class ViewCompanyController {
     /** US #16 — Read a single company (immutable record — no side effects). */
     public static function viewCompanyInfo(array $params): void {
@@ -484,7 +457,6 @@ class ViewCompanyController {
     }
 }
 
-/** Current: CompanyUpdateController  |  Original teammate: CompanyUpdateController */
 class CompanyUpdateController {
     /** US #17 — Update a company; 403 unless caller owns it. */
     public static function updateCompanyInfo(array $params): void {
@@ -514,7 +486,6 @@ class CompanyUpdateController {
     }
 }
 
-/** Current: DeleteCompanyInfoController  |  Original teammate: Delete_CompanyInfo_Controller */
 class DeleteCompanyInfoController {
     /**
      * US #18 — Delete a company.
@@ -539,7 +510,6 @@ class DeleteCompanyInfoController {
     }
 }
 
-/** Current: SearchCompanyInfoController  |  Original teammate: searchCoyinfo_Controller */
 class SearchCompanyInfoController {
     /** US #19 — Search only the current designer's companies. */
     public static function searchCompanyInfo(): void {
@@ -581,7 +551,6 @@ class ProjectAuth {
  * [SECTION: PROJECT CONTROLLERS]  US #20–#31
  * ============================================================================= */
 
-/** Current: ProjectCreationController  |  Original teammate: projCreationController */
 class ProjectCreationController {
     /**
      * US #20 — Create an ongoing (or user-specified status) project.
@@ -612,7 +581,6 @@ class ProjectCreationController {
     }
 }
 
-/** Current: CreateCompletedProjController  |  Original teammate: createCompletedProj_Controller */
 class CreateCompletedProjController {
     /**
      * US #25 — Create a COMPLETED project.
@@ -641,7 +609,6 @@ class CreateCompletedProjController {
     }
 }
 
-/** Current: ViewProjectController  |  Original teammate: viewProjectController */
 class ViewProjectController {
     /** US #21 — Read a single project by id. */
     public static function getProject(array $params): void {
@@ -666,7 +633,6 @@ class ViewProjectController {
     }
 }
 
-/** Current: ViewCompletedProjController  |  Original teammate: viewCompletedProj_Controller */
 class ViewCompletedProjController {
     /**
      * US #26 — Read a completed project.
@@ -682,7 +648,6 @@ class ViewCompletedProjController {
     }
 }
 
-/** Current: UpdateProjectController  |  Original teammate: updateProject_Controller */
 class UpdateProjectController {
     /** US #22 — Update a project. Ownership enforced via ProjectAuth. */
     public static function updateProject(array $params): void {
@@ -713,7 +678,6 @@ class UpdateProjectController {
     }
 }
 
-/** Current: UpdateCompletedProjController  |  Original teammate: updateCompletedProj_Controller */
 class UpdateCompletedProjController {
     /** US #27 — Update a completed project. Same flow as UpdateProjectController. */
     public static function updateProject(array $params): void {
@@ -741,7 +705,6 @@ class UpdateCompletedProjController {
     }
 }
 
-/** Current: DeleteProjectController  |  Original teammate: deleteProject_Controller */
 class DeleteProjectController {
     /**
      * US #23 — Delete an ongoing project. Cascade removes project_view and
@@ -756,10 +719,6 @@ class DeleteProjectController {
     }
 }
 
-/** Current: DeleteProjectController  |  Original teammate: deleteProj_controller */
-
-
-/** Current: SearchProjectController  |  Original teammate: SearchProjectController */
 class SearchProjectController {
     /**
      * US #24 — Search projects within a company.
@@ -781,15 +740,10 @@ class SearchProjectController {
     }
 }
 
-/** Current: SearchCompeletedController  |  Original teammate: SearchCompeletedController */
 class SearchCompeletedController {
     /**
      * US #29 — Search completed projects within a company.
      * Same as SearchProjectController but hardcodes status='Completed'.
-     *
-     * NOTE: The original teammate class name intentionally preserves the
-     * historical misspelling "SearchCompeletedController" (Compeleted instead
-     * of Completed) — kept as-is for git/report traceability.
      */
     public static function SearchProject(array $params): void {
         $c = CompanyInfo::viewCompanyInfo($params['companyId']);
@@ -810,7 +764,6 @@ class SearchCompeletedController {
  * [SECTION: PUBLIC / CROSS-PROJECT CONTROLLERS]  US #30, #31, #37, #38
  * ============================================================================= */
 
-/** Current: SearchAllInterestController  |  Original teammate: viewCountController */
 class SearchAllInterestController {
     /**
      * US #37, #38 (cross-company) — Aggregated views + shortlists for every
@@ -826,7 +779,6 @@ class SearchAllInterestController {
     }
 }
 
-/** Current: SearchPublicProjectController  |  Original teammate: customerSearchProjectController */
 class SearchPublicProjectController {
     /**
      * US #30 — Public project search (Customer Discovery Gallery).
@@ -842,7 +794,6 @@ class SearchPublicProjectController {
     }
 }
 
-/** Current: ViewPublicProjectController  |  Original teammate: viewProjController */
 class ViewPublicProjectController {
     /**
      * US #31 — View a public project (Customer).
@@ -864,8 +815,6 @@ class ViewPublicProjectController {
 /* =============================================================================
  * [SECTION: FAVOURITES CONTROLLERS]  US #32–#34
  * ============================================================================= */
-
-/** Current: ProjectInterestController  |  Original teammate: FavouriteCountController */
 class ProjectInterestController {
     /**
      * US #37, #38 (per-company) — Aggregated views + shortlists for one
@@ -880,8 +829,6 @@ class ProjectInterestController {
         json_out(200, ['interest' => Project::getProjectDetails($params['companyId'])]);
     }
 }
-
-/** Current: FavouriteController  |  Original teammate: FavouriteController */
 class FavouriteController {
     /**
      * US #32 — Save a project to favourites. Idempotent (entity uses
@@ -922,7 +869,6 @@ class FavouriteController {
     }
 }
 
-/** Current: SearchAllProjectsController  |  Original teammate: SearchFavouriteController */
 class SearchAllProjectsController {
     /**
      * Cross-company project search scoped to the current designer.
@@ -940,7 +886,6 @@ class SearchAllProjectsController {
     }
 }
 
-/** Current: ViewFavouritesController  |  Original teammate: viewFavouritesController */
 class ViewFavouritesController {
     /**
      * Alias controller kept for API stability. Functionally identical to
@@ -955,8 +900,6 @@ class ViewFavouritesController {
 /* =============================================================================
  * [SECTION: CATEGORY CONTROLLERS]  US #41–#45 (Platform Manager only)
  * ============================================================================= */
-
-/** Current: CreateCategoryController  |  Original teammate: CreateCategoryController */
 class CreateCategoryController {
     /** US #41 — Create a category. Name must be unique. */
     public static function submitCategory(): void {
@@ -976,7 +919,6 @@ class CreateCategoryController {
     }
 }
 
-/** Current: ViewCategoryController  |  Original teammate: ViewCategoryController */
 class ViewCategoryController {
     /** US #42 — List all categories (alphabetised). */
     public static function getCategories(): void {
@@ -995,8 +937,6 @@ class ViewCategoryController {
         json_out(200, ['category' => $c]);
     }
 }
-
-/** Current: UpdateCategoryController  |  Original teammate: UpdateCategoryController */
 class UpdateCategoryController {
     /** US #43 — Update a category (name + description). */
     public static function updateCategory(array $params): void {
@@ -1015,7 +955,6 @@ class UpdateCategoryController {
     }
 }
 
-/** Current: DeleteCategoryController  |  Original teammate: DeleteCategoryController */
 class DeleteCategoryController {
     /** US #44 — Delete a category. Cascade at DB level removes project_category links. */
     public static function deleteCategory(array $params): void {
@@ -1030,7 +969,6 @@ class DeleteCategoryController {
     }
 }
 
-/** Current: SearchCategoryController  |  Original teammate: SearchCategoryController */
 class SearchCategoryController {
     /** US #45 — Search categories by name (ILIKE). */
     public static function searchCategory(): void {
@@ -1050,7 +988,6 @@ class SearchCategoryController {
  * Report BCE report operation — the only difference is the time window.
  * ============================================================================= */
 
-/** Current: DailyReportController  |  Original teammate: DailyReportController */
 class DailyReportController {
     /** US #46 — Daily report (rolling 24 hours). */
     public static function generateDailyReport(array $params = []): void {
@@ -1058,7 +995,6 @@ class DailyReportController {
     }
 }
 
-/** Current: WeeklyReportController  |  Original teammate: WeeklyReportController */
 class WeeklyReportController {
     /** US #47 — Weekly report (rolling 7 days). */
     public static function generateWeeklyReport(array $params = []): void {
@@ -1066,7 +1002,6 @@ class WeeklyReportController {
     }
 }
 
-/** Current: MonthlyReportController  |  Original teammate: MonthlyReportController */
 class MonthlyReportController {
     /** US #48 — Monthly report (rolling 30 days). */
     public static function generateMonthlyReport(array $params = []): void {

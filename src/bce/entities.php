@@ -6,30 +6,12 @@ declare(strict_types=1);
  * ENTITY LAYER — src/bce/entities.php
  * =============================================================================
  * Role in BCE: The "E" layer. The ONLY place where SQL lives.
- *
- * =============================================================================
- * ORIGINAL-TEAMMATE CLASS NAME STATUS
- * =============================================================================
- * Unlike the controller layer, every entity class name was kept as originally
- * designed — no renames occurred during the Sprint 3 refactor. The mapping
- * to the report's BCE diagrams is therefore one-to-one, with ONE exception
- * documented below.
- *
- * Per-class convention:
- *     // Entity: <ClassName>  |  Original teammate: <ClassName>
- *
- * The exception: The report is internally inconsistent about the company
- * entity — page 68 labels it <<Entity>> Company, while page 72 labels it
- * <<Entity>> CompanyInfo. The code consolidated on CompanyInfo. See the
- * class-level marker for details.
  * =============================================================================
  */
-
 /* =============================================================================
  * [ENTITY: UserAcc]  Backs US #1–#7 — user account storage
  * ============================================================================= */
 
-/** Entity: UserAcc  |  Original teammate: UserAcc  (no rename; matches report p.14) */
 class UserAcc
 {
     /** US #5 — Read a single account joined with its profile. */
@@ -149,8 +131,6 @@ class UserAcc
 /* =============================================================================
  * [ENTITY: UserProfile]  Backs US #8–#12 — role / permission storage
  * ============================================================================= */
-
-/** Entity: UserProfile  |  Original teammate: UserProfile  (no rename; matches report p.50) */
 class UserProfile
 {
     /**
@@ -212,18 +192,7 @@ class UserProfile
 
 /* =============================================================================
  * [ENTITY: CompanyInfo]  Backs US #15–#19 — company records
- * =============================================================================
- * NOTE ON REPORT DISCREPANCY:
- *   The report's BCE diagrams are internally inconsistent about this entity's
- *   name:
- *     - Report p.68 draws <<Entity>> Company
- *     - Report p.72 draws <<Entity>> CompanyInfo
- *   The codebase consolidated on CompanyInfo (already used on p.72 and in
- *   the sequence-diagram labels for US #16–#19). If you need to reconcile
- *   the report, update p.68 to match p.72 (or vice versa).
  * ============================================================================= */
-
-/** Entity: CompanyInfo  |  Original teammate: CompanyInfo  (see report-discrepancy note above) */
 class CompanyInfo
 {
     /** US #15 — Insert a company owned by the given account. */
@@ -299,8 +268,6 @@ class CompanyInfo
 /* =============================================================================
  * [ENTITY: Project]  Backs US #20–#31, #37, #38
  * ============================================================================= */
-
-/** Entity: Project  |  Original teammate: Project  (no rename; matches report p.84, p.126) */
 class Project
 {
     /** US #20 / #25 — Insert a project; `status` chosen by caller. */
@@ -486,8 +453,6 @@ class Project
 /* =============================================================================
  * [ENTITY: Favourite]  Backs US #32–#34
  * ============================================================================= */
-
-/** Entity: Favourite  |  Original teammate: Favourite  (no rename; matches report p.153) */
 class Favourite
 {
     /** Existence check for idempotent-save confirmation. */
@@ -539,8 +504,6 @@ class Favourite
 /* =============================================================================
  * [ENTITY: Category]  Backs US #41–#45
  * ============================================================================= */
-
-/** Entity: Category  |  Original teammate: Category  (no rename; matches report p.104) */
 class Category
 {
     /** Existence check for delete controller. */
@@ -598,8 +561,6 @@ class Category
 /* =============================================================================
  * [ENTITY: Report]  Backs US #46–#48
  * ============================================================================= */
-
-/** Entity: Report  |  Original teammate: Report  (no rename; matches report p.173) */
 class Report
 {
     /**
