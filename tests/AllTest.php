@@ -296,7 +296,12 @@ class AllTest extends TestCase
         $this->assertArrayHasKey('message', $r['body']);
 
         // #18 Delete
-        $toDel = self::req('POST','/api/companies',['company_name'=>'ToDel'],'d')['body']['company']['company_id'];
+        $toDel = self::req('POST','/api/companies',[
+            'company_name'=>'ToDel',
+            'address'=>'3 St',
+            'contact_no'=>'91234567'
+        ],'d')['body']['company']['company_id'];
+        
         $this->assertSame(200, self::req('DELETE',"/api/companies/$toDel",null,'d')['status']);
         $this->assertSame(404, self::req('DELETE','/api/companies/99999999',null,'d')['status']);
     }
@@ -306,7 +311,11 @@ class AllTest extends TestCase
     // =====================================================================
     public function test_20_34_projects_and_favourites(): void
     {
-        $cid = self::req('POST','/api/companies',['company_name'=>'ProjCo'],'d')['body']['company']['company_id'];
+        $cid = self::req('POST','/api/companies',[
+            'company_name'=>'ProjCo',
+            'address'=>'4 St',
+            'contact_no'=>'91234567'
+        ],'d')['body']['company']['company_id'];
 
         // #20 Create Ongoing
         $r = self::req('POST','/api/projects',[
@@ -412,8 +421,12 @@ class AllTest extends TestCase
     // =====================================================================
     public function test_21_view_new_project_by_id(): void
     {
-        $cid = self::req('POST','/api/companies',['company_name'=>'Test Studio 21'],'d')
-                     ['body']['company']['company_id'];
+        $cid = self::req('POST','/api/companies',[
+            'company_name'=>'Test Studio 21',
+            'address'=>'5 St',
+            'contact_no'=>'91234567'
+        ],'d')['body']['company']['company_id'];
+
         $pid = self::req('POST','/api/projects',[
             'company_id'=>$cid,'title'=>'View 21','description'=>'d','status'=>'Ongoing',
         ],'d')['body']['project']['project_id'];
@@ -430,8 +443,12 @@ class AllTest extends TestCase
     // =====================================================================
     public function test_26_view_completed_project_by_id(): void
     {
-        $cid = self::req('POST','/api/companies',['company_name'=>'Test Studio 26'],'d')
-                     ['body']['company']['company_id'];
+        $cid = self::req('POST','/api/companies',[
+            'company_name'=>'Test Studio 26',
+            'address'=>'6 St',
+            'contact_no'=>'91234567'
+        ],'d')['body']['company']['company_id'];
+
         $pid = self::req('POST','/api/projects/completed',[
             'company_id'=>$cid,'title'=>'View 26','description'=>'d',
         ],'d')['body']['project']['project_id'];
@@ -452,8 +469,12 @@ class AllTest extends TestCase
     // =====================================================================
     public function test_27_update_completed_project(): void
     {
-        $cid = self::req('POST','/api/companies',['company_name'=>'Test Studio 27'],'d')
-                     ['body']['company']['company_id'];
+        $cid = self::req('POST','/api/companies',[
+            'company_name'=>'Test Studio 27',
+            'address'=>'7 St',
+            'contact_no'=>'91234567'
+        ],'d')['body']['company']['company_id'];
+
         $pid = self::req('POST','/api/projects/completed',[
             'company_id'=>$cid,'title'=>'Old 27','description'=>'d',
         ],'d')['body']['project']['project_id'];
@@ -473,23 +494,15 @@ class AllTest extends TestCase
     // =====================================================================
     // US #37 - View Number of Views (dedicated TDD test)
     // =====================================================================
-    /**
-     * Isolated TDD target for US #37 (View Project Views).
-     *
-     * Kept separate from the aggregated #20-#34 regression test so the
-     * Red-Green-Refactor evidence maps to a single, named test.
-     *
-     * Asserts the report-specified conditions:
-     *   - HTTP 200 status when fetching project interest
-     *   - view data exists (assertNotNull)
-     *   - view data carries a numeric view count
-     *   - counter starts at 0 and increments by exactly 1 after a public view
-     */
     public function test_37_view_project_views(): void
     {
         // --- Arrange: designer creates a project --------------------------
-        $cid = self::req('POST','/api/companies',
-            ['company_name'=>'Test Studio 37'],'d')['body']['company']['company_id'];
+        $cid = self::req('POST','/api/companies',[
+            'company_name'=>'Test Studio 37',
+            'address'=>'8 St',
+            'contact_no'=>'91234567'
+        ],'d')['body']['company']['company_id'];
+
         $pid = self::req('POST','/api/projects',[
             'company_id'=>$cid,'title'=>'Views 37','description'=>'d','status'=>'Ongoing',
         ],'d')['body']['project']['project_id'];
