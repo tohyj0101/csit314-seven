@@ -9,7 +9,7 @@ declare(strict_types=1);
  *   1. Read the request (req_body / $_GET / session_user).
  *   2. Validate input (mandatory fields, formats).
  *   3. Enforce ownership / RBAC (defence-in-depth over boundary.php).
- *   4. Call entity methods (SQL lives in entities.php).
+ *   4. Call entity methods (SQL lives in entities.php)
  *   5. Emit a JSON response (json_out) or an error (display_error).
  *
  * =============================================================================
