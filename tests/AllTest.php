@@ -471,17 +471,19 @@ class AllTest extends TestCase
     }
 
     // =====================================================================
-    // US #37 - View Number of Views (DEDICATED - matches report TDD p.189)
+    // US #37 - View Number of Views (dedicated TDD test)
     // =====================================================================
     /**
-     * Isolated TDD target for Sprint 4 (report p.189). The report states:
-     *   "asserting that fetching project details returns the correct view count
-     *    using assertSame() to check the HTTP status (200) and assertNotNull()
-     *    to verify the view data."
+     * Isolated TDD target for US #37 (View Project Views).
      *
-     * This test isolates US #37 from the aggregated regression test so that
-     * the TDD Red-Green-Refactor evidence in the report is directly traceable
-     * to a single named test.
+     * Kept separate from the aggregated #20-#34 regression test so the
+     * Red-Green-Refactor evidence maps to a single, named test.
+     *
+     * Asserts the report-specified conditions:
+     *   - HTTP 200 status when fetching project interest
+     *   - view data exists (assertNotNull)
+     *   - view data carries a numeric view count
+     *   - counter starts at 0 and increments by exactly 1 after a public view
      */
     public function test_37_view_project_views(): void
     {
@@ -495,16 +497,16 @@ class AllTest extends TestCase
         // --- Act: fetch metrics ------------------------------------------
         $r = self::req('GET',"/api/projects/company/$cid/interest",null,'d');
 
-        // --- Assert: report-specified conditions -------------------------
-        $this->assertSame(200, $r['status'], 'Fetching project interest must return HTTP 200 (report p.189)');
+        // --- Assert: required response conditions ------------------------
+        $this->assertSame(200, $r['status'], 'Fetching project interest must return HTTP 200');
         $this->assertArrayHasKey('interest', $r['body'], 'Response must contain interest array');
 
-        // View data must exist for the project (matches report's assertNotNull requirement)
+        // View data must exist for the project
         $row = null;
         foreach ($r['body']['interest'] as $i) {
             if ((int)$i['project_id'] === (int)$pid) { $row = $i; break; }
         }
-        $this->assertNotNull($row, 'Project interest record must exist (assertNotNull per report p.189)');
+        $this->assertNotNull($row, 'Project interest record must exist');
         $this->assertArrayHasKey('views', $row, 'View data must include a view count');
         $this->assertArrayHasKey('shortlists', $row, 'View data must include a shortlist count');
         $this->assertSame(0, (int)$row['views'], 'A freshly-created project must start with zero views');

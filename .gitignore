@@ -5,3 +5,6 @@ composer-setup.php
 .phpunit.result.cache
 cloudflared.exe
 demo.ps1
+full-demo.mp4
+# Local demo runner — not shared in repo
+setup.ps1

@@ -115,7 +115,7 @@ Strict Boundary–Control–Entity (BCE) separation:
                              │
                              ▼
                        Control Layer   src/bce/controllers.php
-                       42 controllers  (one per user story or story group)
+                       41 controllers  (one per user story or story group)
                              │
                              ▼
                        Entity Layer    src/bce/entities.php
@@ -125,7 +125,7 @@ Strict Boundary–Control–Entity (BCE) separation:
                        PostgreSQL 15   8 tables
 
 - **Boundary** (`src/bce/boundary.php`) — maps HTTP routes to controllers, applies middleware (`auth_guard()`, `role_guard()`)
-- **Control** (`src/bce/controllers.php`) — 42 controllers, one per user story or story group; validates input, enforces ownership, delegates to entities
+- **Control** (`src/bce/controllers.php`) — 41 controllers, one per user story or story group; validates input, enforces ownership, delegates to entities
 - **Entity** (`src/bce/entities.php`) — `UserAcc`, `UserProfile`, `CompanyInfo`, `Project`, `Favourite`, `Category`, `Report`; all SQL lives here
 - **Frontend** (`public/js/app.js`) — single-page app; treats the backend as a REST API
 
@@ -243,7 +243,7 @@ Expected output:
 
     OK (21 tests, 95+ assertions)
 
-**Coverage:** all 48 user stories across:
+**Coverage:** the main flows of all four roles, including:
 
 - Login / logout flows
 - User account and profile CRUD
@@ -274,20 +274,23 @@ Expected output:
     │
     ├── src/
     │   ├── bootstrap.php              # Autoloader + .env loader
-    │   ├── auth.php                   # Password hashing helpers
-    │   ├── db.php                     # PDO wrapper + query helpers (q, q1, ex)
-    │   ├── env.php                    # .env file loader
-    │   ├── authGuard.php              # auth_guard() middleware
-    │   ├── roleGuard.php              # role_guard() middleware
+    │   ├── Router.php                 # HTTP router (route dispatch)
+    │   ├── config/
+    │   │   ├── auth.php               # Password hashing helpers
+    │   │   ├── db.php                 # PDO wrapper + query helpers (q, q1, ex)
+    │   │   └── env.php                # .env file loader
+    │   ├── middleware/
+    │   │   ├── authGuard.php          # auth_guard() middleware
+    │   │   └── roleGuard.php          # role_guard() middleware
     │   └── bce/
-    │       ├── boundary.php           # All 60+ routes
-    │       ├── controllers.php        # All 42 controllers
+    │       ├── boundary.php           # All 50 routes
+    │       ├── controllers.php        # All 41 controllers (+ ProjectAuth helper)
     │       └── entities.php           # All 7 entity classes
     │
     ├── public/
     │   ├── index.html                 # SPA shell
     │   ├── js/
-    │   │   └── app.js                 # All frontend logic (~1000 lines)
+    │   │   └── app.js                 # All frontend logic (about 1,480 lines)
     │   └── css/
     │       └── style.css
     │
@@ -299,7 +302,7 @@ Expected output:
     │   └── workflows/
     │       └── ci.yml                 # GitHub Actions CI pipeline
     │
-    └── README.md                      # This file
+    └── readme.md                      # This file
 
 ---
 
@@ -497,7 +500,7 @@ If the pipeline is red, do not merge. Green CI is the entry criterion for review
 | Toh Yong Jie | 1105243 |
 | Lee Hongyi, Ryan | 1124535 |
 | Marvin Fong Jun Lin | 1124596 |
-| Chiow Jia Long | 1137438 |
+| Chiw Jia Long | 1137438 |
 
 ---
 
