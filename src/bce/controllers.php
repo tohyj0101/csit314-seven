@@ -425,24 +425,37 @@ class CreateCompanyController {
     public static function createCompany(): void {
         try {
             $b = req_body();
-            if (empty($b['company_name'])) {
+
+            $name    = trim((string)($b['company_name'] ?? ''));
+            $address = trim((string)($b['address'] ?? ''));
+            $contact = trim((string)($b['contact_no'] ?? ''));
+
+            // All three fields are mandatory.
+            if ($name === '') {
                 display_error(400, 'Company Name is a mandatory field.', ['field' => 'company_name']);
                 return;
             }
-            $contactNo = $b['contact_no'] ?? '';
-            if (!empty($contactNo)) {
-                $digitsOnly = preg_replace('/\D/', '', $contactNo);
-                if (strlen($digitsOnly) !== 8) {
-                    display_error(400, 'Contact Hotline must be exactly 8 digits (e.g., 91234567).', ['field' => 'contact_no']);
-                    return;
-                }
-                $b['contact_no'] = $digitsOnly;
+            if ($address === '') {
+                display_error(400, 'Address is a mandatory field.', ['field' => 'address']);
+                return;
             }
+            if ($contact === '') {
+                display_error(400, 'Contact Hotline is a mandatory field.', ['field' => 'contact_no']);
+                return;
+            }
+
+            // Strip non-digits, then require exactly 8 (accepts "9123-4567").
+            $digitsOnly = preg_replace('/\D/', '', $contact);
+            if (strlen($digitsOnly) !== 8) {
+                display_error(400, 'Contact Hotline must be exactly 8 digits (e.g., 91234567).', ['field' => 'contact_no']);
+                return;
+            }
+
             json_out(201, ['company' => CompanyInfo::createCompany([
                 'owner_id'     => session_user()['account_id'],
-                'company_name' => $b['company_name'],
-                'address'      => $b['address'] ?? null,
-                'contact_no'   => $b['contact_no'] ?? null,
+                'company_name' => $name,
+                'address'      => $address,
+                'contact_no'   => $digitsOnly,
             ])]);
         } catch (Throwable $e) { handle_error($e, 'Failed to create company profile.'); }
     }
@@ -467,21 +480,37 @@ class CompanyUpdateController {
                 display_error(403, 'You do not have permission to edit this company.');
                 return;
             }
+
             $b = req_body();
-            if (empty($b['company_name'])) {
+            $name    = trim((string)($b['company_name'] ?? ''));
+            $address = trim((string)($b['address'] ?? ''));
+            $contact = trim((string)($b['contact_no'] ?? ''));
+
+            // All three fields are mandatory.
+            if ($name === '') {
                 display_error(400, 'Company Name cannot be left blank.', ['field' => 'company_name']);
                 return;
             }
-            $contactNo = $b['contact_no'] ?? '';
-            if (!empty($contactNo)) {
-                $digitsOnly = preg_replace('/\D/', '', $contactNo);
-                if (strlen($digitsOnly) !== 8) {
-                    display_error(400, 'Contact Hotline must be exactly 8 digits (e.g., 91234567).', ['field' => 'contact_no']);
-                    return;
-                }
-                $b['contact_no'] = $digitsOnly;
+            if ($address === '') {
+                display_error(400, 'Address cannot be left blank.', ['field' => 'address']);
+                return;
             }
-            json_out(200, ['company' => CompanyInfo::updateCompanyInfo($params['id'], $b)]);
+            if ($contact === '') {
+                display_error(400, 'Contact Hotline cannot be left blank.', ['field' => 'contact_no']);
+                return;
+            }
+
+            $digitsOnly = preg_replace('/\D/', '', $contact);
+            if (strlen($digitsOnly) !== 8) {
+                display_error(400, 'Contact Hotline must be exactly 8 digits (e.g., 91234567).', ['field' => 'contact_no']);
+                return;
+            }
+
+            json_out(200, ['company' => CompanyInfo::updateCompanyInfo($params['id'], [
+                'company_name' => $name,
+                'address'      => $address,
+                'contact_no'   => $digitsOnly,
+            ])]);
         } catch (Throwable $e) { handle_error($e); }
     }
 }
