@@ -903,7 +903,7 @@ class SearchAllProjectsController {
      * Cross-company project search scoped to the current designer.
      * Distinct from SearchPublicProjectController (which is customer-facing).
      */
-    public static function searchFavourite(): void {
+    public static function searchProjects(): void {
         $q = $_GET['q'] ?? '';
         $status = $_GET['status'] ?? null;
         $rows = Project::searchAllByOwner(session_user()['account_id'], $q, $status);
