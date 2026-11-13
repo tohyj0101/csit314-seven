@@ -38,7 +38,7 @@ $r->delete('/companies/:id', [$auth, $D], fn($p) => DeleteCompanyInfoController:
 
 $r->post('/projects', [$auth, $D], fn() => ProjectCreationController::createProject());
 $r->post('/projects/completed', [$auth, $D], fn() => CreateCompletedProjController::createProject());
-$r->get('/projects/search', [$auth, $D], fn() => SearchAllProjectsController::searchFavourite());
+$r->get('/projects/search', [$auth, $D], fn() => SearchAllProjectsController::searchProjects());
 $r->get('/projects/company/:companyId', [$auth, $D], fn($p) => ViewProjectController::getProjectsByCompany($p));
 $r->get('/projects/company/:companyId/search', [$auth, $D], fn($p) => SearchProjectController::SearchProject($p));
 $r->get('/projects/company/:companyId/completed/search', [$auth, $D], fn($p) => SearchCompeletedController::SearchProject($p));

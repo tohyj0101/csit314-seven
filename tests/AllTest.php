@@ -360,6 +360,16 @@ class AllTest extends TestCase
         $this->assertSame(0, count($r['body']['projects']));
         $this->assertArrayHasKey('message', $r['body']);
 
+        // #24 Cross-company search (used by the Projects page UI) - regression:
+        // route used to point at a non-existent controller method -> 500
+        $r = self::req('GET','/api/projects/search?q=Revamp&status=Ongoing',null,'d');
+        $this->assertSame(200, $r['status']);
+        $this->assertGreaterThanOrEqual(1, count($r['body']['projects']));
+        $r = self::req('GET','/api/projects/search?q=zzzznomatch',null,'d');
+        $this->assertSame(200, $r['status']);
+        $this->assertSame(0, count($r['body']['projects']));
+        $this->assertArrayHasKey('message', $r['body']);
+
         // #29 Search Completed
         $this->assertGreaterThanOrEqual(1, count(self::req('GET',
             "/api/projects/company/$cid/completed/search?q=Past",null,'d')['body']['projects']));
