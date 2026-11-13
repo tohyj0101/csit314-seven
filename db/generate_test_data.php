@@ -18,6 +18,18 @@ require __DIR__ . '/../src/bootstrap.php';
 echo "--- STARTING COMPREHENSIVE DATA GENERATION ---\n";
 $hash = hash_password('Password123!');
 
+/**
+ * Spread rows across the report time-buckets (Daily / Weekly / Monthly / older).
+ * Reports filter on created_at / viewed_at / saved_at, so those timestamps - not
+ * just project.date - must be back-dated for the three reports to differ.
+ */
+function spread_days(int $i): int {
+    if ($i <= 20) return 0;            // today          -> Daily, Weekly, Monthly
+    if ($i <= 45) return 3;            // this week      -> Weekly, Monthly
+    if ($i <= 70) return 15;           // this month     -> Monthly
+    return rand(40, 365);              // older          -> none
+}
+
 // =============================================================================
 // 1. ENSURE BASE PROFILES EXIST (Required for fresh databases)
 // =============================================================================
@@ -43,15 +55,19 @@ for ($i = 1; $i <= 100; $i++) {
     // COVERAGE: 10% of users are suspended to test LoginController blocking
     $status = ($i % 10 === 0) ? 'Suspended' : 'Active';
     
-    if (!UserAcc::findByEmail($email)) {
-        $uid = UserAcc::saveAccount([
+    if (!UserAcc::checkDuplicate($email)) {
+        $uid = UserAcc::createUserAccount([
             'profile_id' => $pids[$role], 'username' => $username, 'email' => $email, 'password_hash' => $hash
         ])['account_id'];
         
         // Force status if suspended
         if ($status === 'Suspended') {
-            UserAcc::updateStatus($uid, 'Suspended');
+            UserAcc::suspendUserAccount($uid, 'Suspended');
         }
+
+        // Back-date so the Reports time-buckets differ
+        ex("UPDATE user_account SET created_at = now() - ($2::int * INTERVAL '1 day') WHERE account_id = $1",
+           [$uid, spread_days($i)]);
     }
 }
 echo "✅ 100 Users generated (Includes Suspended).\n";
@@ -84,7 +100,7 @@ for ($i = 1; $i <= 100; $i++) {
         $phone = ($i % 2 === 0) ? "9" . rand(1000000, 9999999) : "8" . rand(1000000, 9999999);
         $address = ($i % 5 === 0) ? null : "Address $i"; // COVERAGE: Test empty addresses
         
-        CompanyInfo::saveCompany([
+        CompanyInfo::createCompany([
             'owner_id' => $owner, 
             'company_name' => $name, 
             'address' => $address, 
@@ -118,8 +134,8 @@ for ($i = 1; $i <= 100; $i++) {
 
         // [FIX] Direct SQL insert to guarantee the date column is persisted
         $row = q1(
-            'INSERT INTO project (company_id, title, description, status, date)
-             VALUES ($1, $2, $3, $4, $5) RETURNING project_id',
+            'INSERT INTO project (company_id, title, description, status, date, created_at)
+             VALUES ($1, $2, $3, $4, $5, $5::timestamptz) RETURNING project_id',
             [$comp, $title, "Auto-generated project $i", $status, $date]
         );
         $pid = (int)$row['project_id'];
@@ -142,10 +158,13 @@ $popularProjects = array_slice($projects, 0, 50);
 for ($i = 1; $i <= 100; $i++) {
     $proj = $popularProjects[array_rand($popularProjects)]['project_id'];
     $cust = $customers[array_rand($customers)]['account_id'];
-    ex('INSERT INTO project_view (project_id, customer_id) VALUES ($1, $2)', [$proj, $cust]);
+    $age = spread_days($i);
+    ex("INSERT INTO project_view (project_id, customer_id, viewed_at)
+        VALUES ($1, $2, now() - ($3::int * INTERVAL '1 day'))", [$proj, $cust, $age]);
     
     $projFav = $popularProjects[array_rand($popularProjects)]['project_id'];
-    Favourite::saveFavourite($cust, $projFav);
+    ex("INSERT INTO favourite (customer_id, project_id, saved_at)
+        VALUES ($1, $2, now() - ($3::int * INTERVAL '1 day')) ON CONFLICT DO NOTHING", [$cust, $projFav, $age]);
 }
 echo "✅ 100 Views & Favourites generated (50 projects left empty for testing).\n";
 
