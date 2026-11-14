@@ -6,5 +6,9 @@ composer-setup.php
 cloudflared.exe
 demo.ps1
 full-demo.mp4
-# Local demo runner — not shared in repo
+# Local demo runner ï¿½ not shared in repo
 setup.ps1
+demo.js
+er_diagrams_sprints.pdf
+uml_diagrams_sprints.pdf
+T04_SevenReport.pdf
