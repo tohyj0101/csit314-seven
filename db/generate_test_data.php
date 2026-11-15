@@ -4,18 +4,27 @@ require __DIR__ . '/../src/bootstrap.php';
 
 /**
  * =============================================================================
- * COMPREHENSIVE SYNTHETIC DATA GENERATOR
+ * SYNTHETIC DATA GENERATOR  -  exactly 100 rows of every entity
  * =============================================================================
- * This script ensures 100% test coverage by generating:
- * 1. Core Profiles (safe to run on fresh DB)
- * 2. Users (Active & Suspended statuses)
- * 3. Companies (With and without projects)
- * 4. Projects (Ongoing & Completed, distributed across time for Reports)
- * 5. Views & Favourites (Popular projects AND empty projects)
+ * Synthetic rows (all counted separately from seed.php data):
+ *   100 user profiles    (+ the 4 real role profiles, kept separate)
+ *   100 user accounts    (_gen usernames; 10% Suspended)
+ *   100 categories
+ *   100 companies        (ALL owned by one designer, so one login sees all 100)
+ *   100 projects         (+ 100 project_category links; ALL in one company,
+ *                         as stated in the report's Test Data section, p.260)
+ *   100 project views
+ *   100 favourites       (ALL saved by one customer, one per project, so one login sees all 100)
+ *
+ * Safe to re-run: every section "tops up" to 100 instead of adding 100 more.
+ * mt_srand() makes the random choices repeatable between runs.
  * =============================================================================
  */
 
-echo "--- STARTING COMPREHENSIVE DATA GENERATION ---\n";
+const TARGET = 100;
+mt_srand(314);
+
+echo "--- STARTING SYNTHETIC DATA GENERATION (target: " . TARGET . " of each) ---\n";
 $hash = hash_password('Password123!');
 
 /**
@@ -27,193 +36,227 @@ function spread_days(int $i): int {
     if ($i <= 20) return 0;            // today          -> Daily, Weekly, Monthly
     if ($i <= 45) return 3;            // this week      -> Weekly, Monthly
     if ($i <= 70) return 15;           // this month     -> Monthly
-    return rand(40, 365);              // older          -> none
+    return mt_rand(40, 365);           // older          -> none
+}
+
+function count_of(string $sql, array $params = []): int {
+    return (int)q1($sql, $params)['c'];
 }
 
 // =============================================================================
-// 1. ENSURE BASE PROFILES EXIST (Required for fresh databases)
+// 1. USER PROFILES: 4 real roles + 100 synthetic profiles
 // =============================================================================
 $roles = ['Customer', 'Interior Designer', 'Platform Manager', 'User Admin'];
 foreach ($roles as $role) {
-    if (!q1("SELECT profile_id FROM user_profile WHERE profile_name = $1", [$role])) {
-        UserProfile::createProfile(['profile_name' => $role, 'permissions' => '{}']);
+    if (!q1('SELECT profile_id FROM user_profile WHERE profile_name = $1', [$role])) {
+        // permissions must be an array: createProfile() implodes it into '{a,b}'
+        UserProfile::createProfile(['profile_name' => $role, 'permissions' => []]);
     }
 }
-$profiles = q('SELECT profile_id, profile_name FROM user_profile');
 $pids = [];
-foreach ($profiles as $p) $pids[$p['profile_name']] = $p['profile_id'];
-echo "✅ Base User Profiles ensured.\n";
+foreach (q('SELECT profile_id, profile_name FROM user_profile') as $p) {
+    $pids[$p['profile_name']] = $p['profile_id'];
+}
+
+for ($i = 1; $i <= TARGET; $i++) {
+    $name = "Synthetic Profile $i";
+    if (!q1('SELECT profile_id FROM user_profile WHERE profile_name = $1', [$name])) {
+        $prof = UserProfile::createProfile(['profile_name' => $name, 'permissions' => []]);
+        // COVERAGE: 10% suspended profiles (no users are attached to these)
+        if ($i % 10 === 0) {
+            UserProfile::updateStatus($prof['profile_id'], 'Suspended');
+        }
+    }
+}
+echo "✅ 100 synthetic User Profiles ensured (+ 4 base role profiles).\n";
 
 // =============================================================================
-// 2. GENERATE 100 USERS (Covering Active & Suspended states)
+// 2. 100 USER ACCOUNTS (Active & Suspended), spread over the 4 real roles
 // =============================================================================
-for ($i = 1; $i <= 100; $i++) {
-    $role = $roles[$i % 4];
-    $username = strtolower(str_replace(' ', '', $role)) . "_gen" . $i;
-    $email = $username . '@example.test';
-    
-    // COVERAGE: 10% of users are suspended to test LoginController blocking
-    $status = ($i % 10 === 0) ? 'Suspended' : 'Active';
-    
+for ($i = 1; $i <= TARGET; $i++) {
+    $role     = $roles[$i % 4];
+    $username = strtolower(str_replace(' ', '', $role)) . '_gen' . $i;
+    $email    = $username . '@example.test';
+
     if (!UserAcc::checkDuplicate($email)) {
         $uid = UserAcc::createUserAccount([
-            'profile_id' => $pids[$role], 'username' => $username, 'email' => $email, 'password_hash' => $hash
+            'profile_id' => $pids[$role], 'username' => $username,
+            'email' => $email, 'password_hash' => $hash,
         ])['account_id'];
-        
-        // Force status if suspended
-        if ($status === 'Suspended') {
+
+        // COVERAGE: 10% of users are suspended to test LoginController blocking
+        if ($i % 10 === 0) {
             UserAcc::suspendUserAccount($uid, 'Suspended');
         }
-
         // Back-date so the Reports time-buckets differ
         ex("UPDATE user_account SET created_at = now() - ($2::int * INTERVAL '1 day') WHERE account_id = $1",
            [$uid, spread_days($i)]);
     }
 }
-echo "✅ 100 Users generated (Includes Suspended).\n";
+echo "✅ 100 Users generated (includes Suspended).\n";
 
-$designers = q("SELECT account_id FROM user_account WHERE profile_id = " . $pids['Interior Designer'] . " AND status = 'Active'");
-$customers = q("SELECT account_id FROM user_account WHERE profile_id = " . $pids['Customer'] . " AND status = 'Active'");
+// Only synthetic, Active users are used as owners / viewers / savers below.
+$designers = q('SELECT account_id FROM user_account WHERE profile_id = $1 AND status = \'Active\' AND username LIKE \'%\\_gen%\' ORDER BY account_id', [$pids['Interior Designer']]);
+
+// Designers only see THEIR OWN companies/projects (ownership checks), so every
+// synthetic company is owned by ONE designer: the seed demo designer if it
+// exists, otherwise the first synthetic designer.
+$main    = q1('SELECT account_id FROM user_account WHERE email = $1', ['designer@example.test']);
+$ownerId = $main ? (int)$main['account_id'] : (int)$designers[0]['account_id'];
+$customers = q('SELECT account_id FROM user_account WHERE profile_id = $1 AND status = \'Active\' AND username LIKE \'%\\_gen%\' ORDER BY account_id', [$pids['Customer']]);
+
+// Customers only see THEIR OWN favourites, so all 100 synthetic favourites are
+// saved by ONE customer: the seed demo customer if it exists, else the first
+// synthetic customer. (Views stay spread across customers: only designers see
+// them, as aggregated counts.)
+$mainCust  = q1('SELECT account_id FROM user_account WHERE email = $1', ['customer@example.test']);
+$favCustId = $mainCust ? (int)$mainCust['account_id'] : (int)$customers[0]['account_id'];
 
 // =============================================================================
-// 3. GENERATE 100 CATEGORIES
+// 3. 100 CATEGORIES
 // =============================================================================
-for ($i = 1; $i <= 100; $i++) {
-    $name = "Synthetic Category " . $i;
-    if (!q1("SELECT category_id FROM category WHERE category_name = $1", [$name])) {
+for ($i = 1; $i <= TARGET; $i++) {
+    $name = "Synthetic Category $i";
+    if (!q1('SELECT category_id FROM category WHERE category_name = $1', [$name])) {
         Category::saveCategory(['category_name' => $name, 'description' => "Auto-generated category $i"]);
     }
 }
 echo "✅ 100 Categories generated.\n";
-$categories = q("SELECT category_id FROM category");
+$categories = q('SELECT category_id FROM category WHERE category_name LIKE \'Synthetic Category %\' ORDER BY category_id');
 
 // =============================================================================
-// 4. GENERATE 100 COMPANIES (Covering validation rules)
+// 4. 100 COMPANIES
 // =============================================================================
-for ($i = 1; $i <= 100; $i++) {
-    $name = "Synthetic Company " . $i;
-    if (!q1("SELECT company_id FROM company WHERE company_name = $1", [$name])) {
-        $owner = $designers[array_rand($designers)]['account_id'];
-        
-        // COVERAGE: Test valid 8-digit numbers, and some with dashes/spaces 
-        // to ensure your regex `preg_replace('/\D/', '', $contactNo)` works.
-        $phone = ($i % 2 === 0) ? "9" . rand(1000000, 9999999) : "8" . rand(1000000, 9999999);
-        $address = ($i % 5 === 0) ? null : "Address $i"; // COVERAGE: Test empty addresses
-        
+for ($i = 1; $i <= TARGET; $i++) {
+    $name = "Synthetic Company $i";
+    if (!q1('SELECT company_id FROM company WHERE company_name = $1', [$name])) {
+        // 8-digit Singapore-style numbers starting with 8 or 9
+        $phone   = (($i % 2 === 0) ? '9' : '8') . mt_rand(1000000, 9999999);
+        // COVERAGE: every 5th company has no address (address column is nullable)
+        $address = ($i % 5 === 0) ? null : "Address $i";
+
         CompanyInfo::createCompany([
-            'owner_id' => $owner, 
-            'company_name' => $name, 
-            'address' => $address, 
-            'contact_no' => $phone
+            'owner_id' => $ownerId, 'company_name' => $name,
+            'address' => $address, 'contact_no' => $phone,
         ]);
     }
 }
-echo "✅ 100 Companies generated.\n";
-$companies = q("SELECT company_id FROM company");
+// Repair step: also fixes rows left by an older run that used random owners.
+ex('UPDATE company SET owner_id = $1 WHERE company_name LIKE \'Synthetic Company %\'', [$ownerId]);
+echo "✅ 100 Companies generated (all owned by account #$ownerId).\n";
+$companies     = q('SELECT company_id FROM company WHERE company_name LIKE \'Synthetic Company %\' ORDER BY company_id');
+$mainCompanyId = (int)$companies[0]['company_id'];   // "Synthetic Company 1" holds all 100 projects
 
 // =============================================================================
-// 5. GENERATE 100 PROJECTS (Covering Reports time-buckets & Empty States)
+// 5. 100 PROJECTS (+ 100 project_category links)
 // =============================================================================
-for ($i = 1; $i <= 100; $i++) {
-    $title = "Synthetic Project " . $i;
-    if (!q1("SELECT project_id FROM project WHERE title = $1", [$title])) {
-        $comp = $companies[array_rand($companies)]['company_id'];
-        $cat  = $categories[array_rand($categories)]['category_id'];
-        $status = ($i % 2 == 0) ? 'Completed' : 'Ongoing';
+for ($i = 1; $i <= TARGET; $i++) {
+    $title = "Synthetic Project $i";
+    if (!q1('SELECT project_id FROM project WHERE title = $1', [$title])) {
+        $comp   = $mainCompanyId;
+        $cat    = $categories[array_rand($categories)]['category_id'];
+        $status = ($i % 2 === 0) ? 'Completed' : 'Ongoing';
 
-        // COVERAGE: Distribute dates across Today, This Week, This Month, and Last Year
-        if ($i <= 10) {
-            $date = date('Y-m-d');                          // Today (tests Daily Report)
-        } elseif ($i <= 20) {
-            $date = date('Y-m-d', strtotime('-3 days'));    // This week
-        } elseif ($i <= 30) {
-            $date = date('Y-m-d', strtotime('-15 days'));   // This month
-        } else {
-            $date = date('Y-m-d', strtotime('-' . rand(40, 365) . ' days')); // Old
-        }
+        if ($i <= 10)      $date = date('Y-m-d');                                   // today
+        elseif ($i <= 20)  $date = date('Y-m-d', strtotime('-3 days'));             // this week
+        elseif ($i <= 30)  $date = date('Y-m-d', strtotime('-15 days'));            // this month
+        else               $date = date('Y-m-d', strtotime('-' . mt_rand(40, 365) . ' days')); // old
 
-        // [FIX] Direct SQL insert to guarantee the date column is persisted
         $row = q1(
             'INSERT INTO project (company_id, title, description, status, date, created_at)
              VALUES ($1, $2, $3, $4, $5, $5::timestamptz) RETURNING project_id',
             [$comp, $title, "Auto-generated project $i", $status, $date]
         );
-        $pid = (int)$row['project_id'];
-
-        // Link project to a category
-        ex('INSERT INTO project_category (project_id, category_id) VALUES ($1, $2)', [$pid, $cat]);
+        ex('INSERT INTO project_category (project_id, category_id) VALUES ($1, $2)', [(int)$row['project_id'], $cat]);
     }
 }
-echo "✅ 100 Projects generated (Dates spread for Reports).\n";
-// Fetch the newly generated projects so we can attach views/favourites to them
-$projects = q("SELECT project_id FROM project");
+// Repair step: move any projects from an older run into the single company.
+ex('UPDATE project SET company_id = $1 WHERE title LIKE \'Synthetic Project %\'', [$mainCompanyId]);
+echo "✅ 100 Projects generated (all in company #$mainCompanyId, dates spread for Reports).\n";
+
+// "Popular" = synthetic projects 1-50 by id get the views. Projects 51-100 stay at 0 views.
+$syntheticProjects = q('SELECT project_id FROM project WHERE title LIKE \'Synthetic Project %\' ORDER BY project_id');
+$popularProjects   = array_slice($syntheticProjects, 0, 50);
 
 // =============================================================================
-// 6. GENERATE VIEWS & FAVOURITES (Covering High-Traffic vs Zero-Traffic)
+// 6a. 100 VIEWS (top up to exactly 100 synthetic views)
 // =============================================================================
-// We intentionally only target the first 50 projects. 
-// The last 50 projects will remain at 0 views/saves to test empty states in UI.
-$popularProjects = array_slice($projects, 0, 50);
-
-for ($i = 1; $i <= 100; $i++) {
+$haveViews = count_of(
+    'SELECT COUNT(*) c FROM project_view v
+       JOIN project p ON p.project_id = v.project_id
+       JOIN user_account u ON u.account_id = v.customer_id
+      WHERE p.title LIKE \'Synthetic Project %\' AND u.username LIKE \'%\\_gen%\''
+);
+for ($n = $haveViews + 1; $n <= TARGET; $n++) {
     $proj = $popularProjects[array_rand($popularProjects)]['project_id'];
     $cust = $customers[array_rand($customers)]['account_id'];
-    $age = spread_days($i);
     ex("INSERT INTO project_view (project_id, customer_id, viewed_at)
-        VALUES ($1, $2, now() - ($3::int * INTERVAL '1 day'))", [$proj, $cust, $age]);
-    
-    $projFav = $popularProjects[array_rand($popularProjects)]['project_id'];
-    ex("INSERT INTO favourite (customer_id, project_id, saved_at)
-        VALUES ($1, $2, now() - ($3::int * INTERVAL '1 day')) ON CONFLICT DO NOTHING", [$cust, $projFav, $age]);
+        VALUES ($1, $2, now() - ($3::int * INTERVAL '1 day'))", [$proj, $cust, spread_days($n)]);
 }
-echo "✅ 100 Views & Favourites generated (50 projects left empty for testing).\n";
-
+echo "✅ 100 Views generated.\n";
 
 // =============================================================================
-// 7. EXHAUSTIVE VERIFICATION & COVERAGE TESTING
+// 6b. 100 FAVOURITES: one customer saves each of the 100 synthetic projects
 // =============================================================================
-echo "--- RUNNING COVERAGE & INTEGRITY TESTS ---\n";
+// Repair step: drop favourites left by an older run that spread them randomly
+// over many synthetic customers.
+ex('DELETE FROM favourite
+     WHERE project_id IN (SELECT project_id FROM project WHERE title LIKE \'Synthetic Project %\')
+       AND customer_id IN (SELECT account_id FROM user_account WHERE username LIKE \'%\\_gen%\')
+       AND customer_id <> $1', [$favCustId]);
+
+foreach ($syntheticProjects as $idx => $sp) {
+    // UNIQUE(customer_id, project_id) makes this idempotent on re-runs
+    ex("INSERT INTO favourite (customer_id, project_id, saved_at)
+        VALUES ($1, $2, now() - ($3::int * INTERVAL '1 day'))
+        ON CONFLICT DO NOTHING", [$favCustId, $sp['project_id'], spread_days($idx + 1)]);
+}
+echo "✅ 100 Favourites generated (all saved by account #$favCustId).\n";
+
+// =============================================================================
+// 7. VERIFICATION: exact counts + state coverage + integrity
+// =============================================================================
+echo "--- RUNNING COUNT, COVERAGE & INTEGRITY CHECKS ---\n";
 $testsPassed = true;
 
 function assertTest(string $description, bool $condition): void {
     global $testsPassed;
-    if ($condition) {
-        echo "✅ [PASS] $description\n";
-    } else {
-        echo "❌ [FAIL] $description\n";
-        $testsPassed = false;
-    }
+    echo ($condition ? '✅ [PASS] ' : '❌ [FAIL] ') . $description . "\n";
+    if (!$condition) $testsPassed = false;
 }
 
-// Test 1: Volume Checks
-assertTest("Generated at least 100 Users", (int)q1("SELECT COUNT(*) c FROM user_account")['c'] >= 100);
-assertTest("Generated at least 100 Projects", (int)q1("SELECT COUNT(*) c FROM project")['c'] >= 100);
+// Exactly 100 of every synthetic entity
+assertTest('100 synthetic User Profiles',  count_of("SELECT COUNT(*) c FROM user_profile WHERE profile_name LIKE 'Synthetic Profile %'") === TARGET);
+assertTest('100 synthetic Users',          count_of("SELECT COUNT(*) c FROM user_account WHERE username LIKE '%\\_gen%'") === TARGET);
+assertTest('100 synthetic Categories',     count_of("SELECT COUNT(*) c FROM category WHERE category_name LIKE 'Synthetic Category %'") === TARGET);
+assertTest('100 synthetic Companies',      count_of("SELECT COUNT(*) c FROM company WHERE company_name LIKE 'Synthetic Company %'") === TARGET);
+assertTest('100 synthetic Projects',       count_of("SELECT COUNT(*) c FROM project WHERE title LIKE 'Synthetic Project %'") === TARGET);
+assertTest('100 project-category links',   count_of("SELECT COUNT(*) c FROM project_category pc JOIN project p USING (project_id) WHERE p.title LIKE 'Synthetic Project %'") === TARGET);
+assertTest('100 synthetic Views',          count_of("SELECT COUNT(*) c FROM project_view v JOIN project p USING (project_id) JOIN user_account u ON u.account_id = v.customer_id WHERE p.title LIKE 'Synthetic Project %' AND u.username LIKE '%\\_gen%'") === TARGET);
+assertTest('100 synthetic Favourites',     count_of("SELECT COUNT(*) c FROM favourite f JOIN project p USING (project_id) WHERE p.title LIKE 'Synthetic Project %'") === TARGET);
 
-// Test 2: State Coverage (Active vs Suspended)
-$suspendedUsers = (int)q1("SELECT COUNT(*) c FROM user_account WHERE status = 'Suspended'")['c'];
-assertTest("Generated Suspended Users for login testing", $suspendedUsers > 0);
+// One owner sees all 100 companies; one company holds all 100 projects
+assertTest('All 100 synthetic Companies share one owner', count_of("SELECT COUNT(DISTINCT owner_id) c FROM company WHERE company_name LIKE 'Synthetic Company %'") === 1);
+assertTest('All 100 synthetic Projects belong to one company', count_of("SELECT COUNT(DISTINCT company_id) c FROM project WHERE title LIKE 'Synthetic Project %'") === 1);
 
-// Test 3: Project Status Coverage (Ongoing vs Completed)
-$ongoing = (int)q1("SELECT COUNT(*) c FROM project WHERE status = 'Ongoing'")['c'];
-$completed = (int)q1("SELECT COUNT(*) c FROM project WHERE status = 'Completed'")['c'];
-assertTest("Generated both Ongoing and Completed projects", $ongoing > 0 && $completed > 0);
+assertTest('All 100 Favourites belong to one customer', count_of("SELECT COUNT(DISTINCT f.customer_id) c FROM favourite f JOIN project p USING (project_id) WHERE p.title LIKE 'Synthetic Project %'") === 1);
 
-// Test 4: Time Coverage for Reports (Today's data)
-$todayProjects = (int)q1("SELECT COUNT(*) c FROM project WHERE date = CURRENT_DATE")['c'];
-assertTest("Generated Projects dated TODAY (Tests Daily Reports)", $todayProjects > 0);
+// State coverage
+assertTest('Suspended users exist (login blocking)',    count_of("SELECT COUNT(*) c FROM user_account WHERE username LIKE '%\\_gen%' AND status = 'Suspended'") > 0);
+assertTest('Suspended profiles exist',                  count_of("SELECT COUNT(*) c FROM user_profile WHERE profile_name LIKE 'Synthetic Profile %' AND status = 'Suspended'") > 0);
+assertTest('Both Ongoing and Completed projects exist', count_of("SELECT COUNT(*) c FROM project WHERE title LIKE 'Synthetic Project %' AND status = 'Ongoing'") > 0
+                                                     && count_of("SELECT COUNT(*) c FROM project WHERE title LIKE 'Synthetic Project %' AND status = 'Completed'") > 0);
+assertTest('Projects dated TODAY exist (Daily Report)', count_of("SELECT COUNT(*) c FROM project WHERE title LIKE 'Synthetic Project %' AND date = CURRENT_DATE") > 0);
+assertTest('At least 50 synthetic projects have 0 views (empty states)',
+    count_of("SELECT COUNT(*) c FROM project p LEFT JOIN project_view v ON v.project_id = p.project_id WHERE p.title LIKE 'Synthetic Project %' AND v.view_id IS NULL") >= 50);
 
-// Test 5: Empty State Coverage (Projects with 0 views)
-$zeroViewsProjects = (int)q1("SELECT COUNT(*) c FROM project p LEFT JOIN project_view v ON p.project_id = v.project_id WHERE v.project_id IS NULL")['c'];
-assertTest("Left some Projects with 0 Views (Tests UI empty states)", $zeroViewsProjects > 0);
-
-// Test 6: Relational Integrity (Orphaned records)
-$orphanedProjects = (int)q1("SELECT COUNT(*) c FROM project p LEFT JOIN company c ON p.company_id = c.company_id WHERE c.company_id IS NULL")['c'];
-assertTest("No Orphaned Projects (Every project has a valid company)", $orphanedProjects === 0);
+// Integrity
+assertTest('No orphaned projects', count_of('SELECT COUNT(*) c FROM project p LEFT JOIN company c ON c.company_id = p.company_id WHERE c.company_id IS NULL') === 0);
 
 echo "-----------------------------------\n";
 if ($testsPassed) {
-    echo "🎉 ALL COVERAGE TESTS PASSED! YOUR APP IS READY FOR EDGE-CASE TESTING. 🎉\n";
+    echo "🎉 ALL CHECKS PASSED: 100 of every entity generated.\n";
 } else {
-    echo "⚠️ COVERAGE TESTS FAILED. CHECK THE OUTPUT ABOVE.\n";
+    echo "⚠️ CHECKS FAILED. SEE OUTPUT ABOVE.\n";
     exit(1);
 }
