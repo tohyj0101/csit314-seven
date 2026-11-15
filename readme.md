@@ -1,6 +1,6 @@
 # CSIT314 T04: Seven — Interior Designer Matching Platform
 
-[![CI](https://github.com/tohyj0101/csit314-seven/actions/workflows/ci.yml/badge.svg)](https://github.com/tohyj0101/csit314-seven/actions/workflows/ci.yml)
+[CI](https://github.com/tohyj0101/csit314-seven/actions/workflows/ci.yml)
 
 A full-stack web platform that connects renovation customers with interior designers. Built with PHP, PostgreSQL and a vanilla JavaScript front end on a Boundary–Control–Entity (BCE) architecture, following Agile/Scrum with CI/CD and integration testing.
 
@@ -10,24 +10,24 @@ A full-stack web platform that connects renovation customers with interior desig
 
 ## Table of Contents
 
-1. [Quick Start](#quick-start)
-2. [Overview](#overview)
-3. [Features by Role](#features-by-role)
-4. [Tech Stack](#tech-stack)
-5. [Architecture](#architecture)
-6. [Prerequisites](#prerequisites)
-7. [Full Setup Guide](#full-setup-guide)
-8. [Test Credentials](#test-credentials)
-9. [Testing](#testing)
-10. [Project Structure](#project-structure)
-11. [Database](#database)
-12. [API Endpoints](#api-endpoints)
-13. [Manual Demo Script](#manual-demo-script)
-14. [Troubleshooting](#troubleshooting)
-15. [Known Limitations](#known-limitations)
-16. [CI/CD](#cicd)
-17. [Team](#team)
-18. [Academic Context](#academic-context)
+1. [Quick Start](https://claude.ai/chat/0e56f8f6-69f3-47be-883b-af485f9a5e6c#quick-start)
+2. [Overview](https://claude.ai/chat/0e56f8f6-69f3-47be-883b-af485f9a5e6c#overview)
+3. [Features by Role](https://claude.ai/chat/0e56f8f6-69f3-47be-883b-af485f9a5e6c#features-by-role)
+4. [Tech Stack](https://claude.ai/chat/0e56f8f6-69f3-47be-883b-af485f9a5e6c#tech-stack)
+5. [Architecture](https://claude.ai/chat/0e56f8f6-69f3-47be-883b-af485f9a5e6c#architecture)
+6. [Prerequisites](https://claude.ai/chat/0e56f8f6-69f3-47be-883b-af485f9a5e6c#prerequisites)
+7. [Full Setup Guide](https://claude.ai/chat/0e56f8f6-69f3-47be-883b-af485f9a5e6c#full-setup-guide)
+8. [Test Credentials](https://claude.ai/chat/0e56f8f6-69f3-47be-883b-af485f9a5e6c#test-credentials)
+9. [Testing](https://claude.ai/chat/0e56f8f6-69f3-47be-883b-af485f9a5e6c#testing)
+10. [Project Structure](https://claude.ai/chat/0e56f8f6-69f3-47be-883b-af485f9a5e6c#project-structure)
+11. [Database](https://claude.ai/chat/0e56f8f6-69f3-47be-883b-af485f9a5e6c#database)
+12. [API Endpoints](https://claude.ai/chat/0e56f8f6-69f3-47be-883b-af485f9a5e6c#api-endpoints)
+13. [Manual Demo Script](https://claude.ai/chat/0e56f8f6-69f3-47be-883b-af485f9a5e6c#manual-demo-script)
+14. [Troubleshooting](https://claude.ai/chat/0e56f8f6-69f3-47be-883b-af485f9a5e6c#troubleshooting)
+15. [Known Limitations](https://claude.ai/chat/0e56f8f6-69f3-47be-883b-af485f9a5e6c#known-limitations)
+16. [CI/CD](https://claude.ai/chat/0e56f8f6-69f3-47be-883b-af485f9a5e6c#cicd)
+17. [Team](https://claude.ai/chat/0e56f8f6-69f3-47be-883b-af485f9a5e6c#team)
+18. [Academic Context](https://claude.ai/chat/0e56f8f6-69f3-47be-883b-af485f9a5e6c#academic-context)
 
 ---
 
@@ -61,7 +61,7 @@ php db/seed.php
 php -S localhost:8000 router.php
 ```
 
-Open <http://localhost:8000> and log in as `designer@example.test` / `Password123!`.
+Open [http://localhost:8000](http://localhost:8000/) and log in as `designer@example.test` / `Password123!`.
 
 > Edit `.env` with your real PostgreSQL password **before** running the `psql` and `php db/seed.php` commands.
 
@@ -71,39 +71,41 @@ Open <http://localhost:8000> and log in as `designer@example.test` / `Password12
 
 The platform serves four user roles, each with its own permissions and workflow:
 
-| Role | What they do |
+|Role|What they do|
 |---|---|
-| **User Admin** | Manages user accounts and user profiles (roles and permissions) |
-| **Interior Designer** | Manages companies and project portfolios; views engagement analytics |
-| **Customer** | Browses and searches public projects; saves favourites |
-| **Platform Manager** | Maintains IDP categories; generates platform-wide reports |
+|**User Admin**|Manages user accounts and user profiles (roles and permissions)|
+|**Interior Designer**|Manages companies and project portfolios; views engagement analytics|
+|**Customer**|Browses and searches public projects; saves favourites|
+|**Platform Manager**|Maintains IDP categories; generates platform-wide reports|
 
 Access control is enforced at two levels:
 
 - **Route level** — the boundary layer rejects requests from the wrong role (`403 Forbidden`). Each route is wrapped in `auth_guard()` (must be logged in) and `role_guard('<Role>')` (must hold the required profile).
-- **Resource level** — controllers verify ownership before changing anything. For example, a designer cannot edit another designer's project, and cannot read another designer's company's project list.
+- **Resource level** — controllers verify ownership before changing anything. For example, a designer cannot edit another designer's company or project, and cannot list another designer's company's projects (403). Ownership is enforced on writes and on list/search endpoints; reading a single record by ID is not ownership-checked (see [Known Limitations](https://claude.ai/chat/0e56f8f6-69f3-47be-883b-af485f9a5e6c#known-limitations)).
 
 ### Role → route matrix
 
-| Route group | User Admin | Designer | Customer | Manager |
+|Route group|User Admin|Designer|Customer|Manager|
 |---|:-:|:-:|:-:|:-:|
-| `/api/auth/*` | ✅ | ✅ | ✅ | ✅ |
-| `/api/users`, `/api/profiles` | ✅ | — | — | — |
-| `/api/companies` | — | ✅ | — | — |
-| `/api/projects` (incl. `/company/...`, `/search`) | — | ✅ | — | — |
-| `/api/projects/public/*`, `/api/favourites` | — | — | ✅ | — |
-| `/api/categories`, `/api/reports/*` | — | — | — | ✅ |
+|`/api/auth/*`|✅|✅|✅|✅|
+|`/api/users`, `/api/profiles`|✅|—|—|—|
+|`/api/companies`|—|✅|—|—|
+|`/api/projects` (incl. `/company/...`, `/search`)|—|✅|—|—|
+|`/api/projects/public/*`, `/api/favourites`|—|—|✅|—|
+|`/api/categories`, `/api/reports/*`|—|—|—|✅|
 
 ---
 
 ## Features by Role
 
 ### User Admin (US #1–#12)
+
 - Login / logout (US #1, #2)
 - Create / view / update / suspend / search user accounts (US #3–#7)
 - Create / view / update / suspend / search user profiles (US #8–#12)
 
 ### Interior Designer (US #13–#29, #37–#38)
+
 - Login / logout (US #13, #14)
 - Create / view / update / delete / search companies (US #15–#19)
 - Create / view / update / delete / search ongoing projects (US #20–#24)
@@ -111,11 +113,13 @@ Access control is enforced at two levels:
 - View view-count and shortlist-count metrics per project (US #37, #38)
 
 ### Customer (US #30–#36)
+
 - Login / logout (US #35, #36)
 - Search and view public projects (US #30, #31)
 - Save to favourites; search and view the favourites list; remove favourites (US #32–#34)
 
 ### Platform Manager (US #39–#48)
+
 - Login / logout (US #39, #40)
 - Create / view / update / delete / search IDP categories (US #41–#45)
 - Generate daily / weekly / monthly reports (US #46–#48)
@@ -124,15 +128,15 @@ Access control is enforced at two levels:
 
 ## Tech Stack
 
-| Layer | Technology |
+|Layer|Technology|
 |---|---|
-| Frontend | Vanilla JavaScript single-page app (hash routing), HTML5, CSS3 |
-| Backend | PHP 8.2+ with no framework: custom `Router` plus BCE controllers |
-| Database | PostgreSQL 15 (14+ also works), accessed through PDO |
-| Auth | PHP session cookies (`HttpOnly`, `SameSite=Lax`) and bcrypt password hashing (cost 10) |
-| Unit/integration tests | PHPUnit 10.5 — HTTP requests against a live server |
-| Smoke test | Node.js 18+ (`demo.js`, uses the built-in `fetch`) — **optional**, not needed to run the app |
-| CI/CD | GitHub Actions — full suite against a fresh PostgreSQL service container |
+|Frontend|Vanilla JavaScript single-page app (hash routing), HTML5, CSS3|
+|Backend|PHP 8.2+ with no framework: custom `Router` plus BCE controllers|
+|Database|PostgreSQL 15 (14+ also works), accessed through PDO|
+|Auth|PHP session cookies (`HttpOnly`, `SameSite=Lax`) and bcrypt password hashing (cost 10)|
+|Unit/integration tests|PHPUnit 10.5 — HTTP requests against a live server|
+|Smoke test|Node.js 18+ (`demo.js`, uses the built-in `fetch`) — **optional**, not needed to run the app|
+|CI/CD|GitHub Actions — full suite against a fresh PostgreSQL service container|
 
 The application itself needs only PHP, PostgreSQL and a browser. There is no build step. Node.js is only needed if you want to run `demo.js`.
 
@@ -166,7 +170,7 @@ Browser  ───────►  Boundary Layer   public/js/app.js
 ### Request lifecycle
 
 1. The browser (or `demo.js`) sends a request to `/api/...`.
-2. `router.php` loads `src/bootstrap.php`, which loads `.env`, starts the session and registers the routes.
+2. `router.php` serves static files directly and hands every other request to `public/index.php`, which loads `src/bootstrap.php` (`.env`, session, classes) and the route table in `src/bce/boundary.php`.
 3. `Router::dispatch()` matches the method and path (e.g. `/projects/company/:companyId`) and extracts named parameters.
 4. Middleware runs in order. `auth_guard()` returns `401` if there is no session. `role_guard()` returns `403` for the wrong role.
 5. The controller validates input and checks ownership, then calls an entity method.
@@ -177,8 +181,8 @@ Browser  ───────►  Boundary Layer   public/js/app.js
 
 - **Custom router.** Express-style paths (`/users/:id`) are converted to regular expressions. Routes are matched in the order they are registered, so fixed paths such as `/projects/search` must be registered **before** `/projects/:id`.
 - **`$1, $2` placeholders.** SQL is written with PostgreSQL-style `$n` placeholders. `db_prepare()` translates them to PDO `?` placeholders and reorders the parameters, so a placeholder can be reused in one query. Every query is a prepared statement.
-- **Structured errors.** Controllers report problems through `display_error()` so the frontend can show consistent banners (see [Error Responses](#error-responses)).
-- **Ownership before search.** The per-company search checks company ownership first, so a caller cannot tell "no results" from "not yours".
+- **Structured errors.** Controllers report problems through `display_error()` so the frontend can show consistent banners (see [Error Responses](https://claude.ai/chat/0e56f8f6-69f3-47be-883b-af485f9a5e6c#error-responses)).
+- **Ownership before search.** The per-company search checks company ownership first and returns `403` for a company the caller does not own. A company you own with no matching projects returns `200` with an empty list.
 
 ---
 
@@ -266,8 +270,10 @@ Or in pgAdmin: right-click **Databases → Create → Database…**, name it `cs
 ```bash
 psql -U postgres -d csit314_seven -f db/schema.sql     # create tables
 php db/seed.php                                        # base demo data
-php db/generate_test_data.php                          # optional: 100+ synthetic records for Reports
+php db/generate_test_data.php                          # optional: exactly 100 synthetic records of each kind
 ```
+
+> **About the generated data.** `generate_test_data.php` creates exactly **100** of each: user profiles, user accounts, categories, companies, projects, project views and favourites (plus 100 project–category links). Designers and customers only see their own records, so the data is arranged for the demo logins: all 100 companies belong to `designer@example.test`, all 100 projects sit in "Synthetic Company 1", and all 100 favourites belong to `customer@example.test`. Every 10th generated user and profile is suspended, and timestamps are back-dated so the daily, weekly and monthly reports differ. The script is safe to re-run: it tops up to 100 rather than adding more, and the random choices are seeded so results repeat. Generated users share the seed password `Password123!` (usernames like `interiordesigner_gen1`).
 
 > ⚠️ `db/schema.sql` begins with `DROP TABLE ... CASCADE`. Running it again **erases all data**. That is useful for resetting, but do not run it on data you want to keep.
 
@@ -277,7 +283,7 @@ php db/generate_test_data.php                          # optional: 100+ syntheti
 php -S localhost:8000 router.php
 ```
 
-Open <http://localhost:8000>. Leave this terminal open while you use the app.
+Open [http://localhost:8000](http://localhost:8000/). Leave this terminal open while you use the app.
 
 For access from another device on the same Wi-Fi:
 
@@ -289,12 +295,12 @@ then browse to `http://<your-ip>:8000`.
 
 ### Composer shortcuts
 
-| Command | What it runs |
+|Command|What it runs|
 |---|---|
-| `composer serve` | `php -S localhost:8000 router.php` |
-| `composer db:init` | `psql -U postgres -d csit314_seven -f db/schema.sql` |
-| `composer db:seed` | `php db/seed.php` |
-| `composer test` | `phpunit` |
+|`composer serve`|`php -S localhost:8000 router.php`|
+|`composer db:init`|`psql -U postgres -d csit314_seven -f db/schema.sql`|
+|`composer db:seed`|`php db/seed.php`|
+|`composer test`|`phpunit`|
 
 ---
 
@@ -302,15 +308,15 @@ then browse to `http://<your-ip>:8000`.
 
 All seeded accounts share the password **`Password123!`**.
 
-| Role | Email | Demo purpose |
+|Role|Email|Demo purpose|
 |---|---|---|
-| User Admin | `admin@example.test` | User accounts, profiles, RBAC |
-| Interior Designer | `designer@example.test` | Companies, projects, analytics |
-| Customer | `customer@example.test` | Browse, search, favourites |
-| Platform Manager | `manager@example.test` | Categories, reports |
-| Suspended | `suspended@example.test` | Login is refused with 403 (US #6, #11) |
+|User Admin|`admin@example.test`|User accounts, profiles, RBAC|
+|Interior Designer|`designer@example.test`|Companies, projects, analytics|
+|Customer|`customer@example.test`|Browse, search, favourites|
+|Platform Manager|`manager@example.test`|Categories, reports|
+|Suspended|`suspended@example.test`|Login is refused with 403 (US #6, #11)|
 
-Logging in as the suspended account is *meant* to fail with HTTP 403. That shows suspension is enforced.
+Logging in as the suspended account is _meant_ to fail with HTTP 403. That shows suspension is enforced.
 
 ---
 
@@ -341,7 +347,6 @@ Expected: `OK (21 tests, 103 assertions)`.
 - Category CRUD
 - Report generation (daily / weekly / monthly)
 - RBAC (403 on cross-role access)
-- Cascade rules (400 when deleting a company that still has projects)
 - **TDD evidence:** `test_37_view_project_views` isolates US #37 (view counter) and documents the Red–Green–Refactor cycle from the report
 
 ### 2. Node.js smoke test — `demo.js`
@@ -349,16 +354,17 @@ Expected: `OK (21 tests, 103 assertions)`.
 Walks through **all 48 user stories** over HTTP as each of the four roles and prints one line per story.
 
 1. Start the server in one terminal (from the project folder):
-
-   ```bash
-   php -S localhost:8000 router.php
-   ```
-
+    
+    ```bash
+    php -S localhost:8000 router.php
+    ```
+    
 2. In a **second** terminal, also from the project folder:
-
-   ```bash
-   node demo.js
-   ```
+    
+    ```bash
+    node demo.js
+    ```
+    
 
 Expected output (abridged):
 
@@ -392,7 +398,7 @@ csit314-seven/
 ├── db/
 │   ├── schema.sql              # 8 table definitions (DROPs and recreates)
 │   ├── seed.php                # Base demo data
-│   └── generate_test_data.php  # Optional: 100+ synthetic records for reports
+│   └── generate_test_data.php  # Optional: exactly 100 synthetic rows of each entity (re-runnable)
 │
 ├── src/
 │   ├── bootstrap.php           # Loads config, classes, .env, session
@@ -428,20 +434,20 @@ csit314-seven/
 
 PostgreSQL, 8 tables.
 
-| Table | Purpose | Notable rules |
+|Table|Purpose|Notable rules|
 |---|---|---|
-| `user_profile` | Role definition (name, description, permissions array, status) | `profile_name` unique; status `Active`/`Suspended` |
-| `user_account` | Login accounts | `username` and `email` unique; bcrypt hash; status `Active`/`Suspended` |
-| `company` | A designer's business | Owned by an account (`ON DELETE CASCADE`) |
-| `category` | IDP categories | `category_name` unique |
-| `project` | Ongoing or completed project | `status` is `Ongoing` or `Completed`; **`ON DELETE RESTRICT`** from `company` |
-| `project_category` | Project ↔ category link | Composite primary key |
-| `project_view` | One row per customer view | Feeds the view counter; customer id is never returned by the API |
-| `favourite` | Customer shortlist | `UNIQUE(customer_id, project_id)` makes saving idempotent |
+|`user_profile`|Role definition (name, description, permissions array, status)|`profile_name` unique; status `Active`/`Suspended`|
+|`user_account`|Login accounts|`username` and `email` unique; bcrypt hash; status `Active`/`Suspended`|
+|`company`|A designer's business|Owned by an account (`ON DELETE CASCADE`)|
+|`category`|IDP categories|`category_name` unique|
+|`project`|Ongoing or completed project|`status` is `Ongoing` or `Completed`; **`ON DELETE RESTRICT`** from `company`|
+|`project_category`|Project ↔ category link|Composite primary key|
+|`project_view`|One row per customer view|Feeds the view counter; customer id is never returned by the API|
+|`favourite`|Customer shortlist|`UNIQUE(customer_id, project_id)` makes saving idempotent|
 
 **Delete behaviour**
 
-- Deleting a **company that has projects** is blocked → HTTP 400 (`ON DELETE RESTRICT`).
+- Deleting a **company that has projects** is blocked by the database (`ON DELETE RESTRICT`), so no data is lost. The API currently reports this as **HTTP 500** with the database error text, not a friendly 400 (see [Known Limitations](https://claude.ai/chat/0e56f8f6-69f3-47be-883b-af485f9a5e6c#known-limitations)).
 - Deleting a **project** removes its views, favourites and category links (`CASCADE`).
 - Deleting a **customer account** removes their favourites and anonymises their views (`SET NULL`).
 
@@ -462,102 +468,102 @@ All endpoints live under `/api/`. Authentication uses a session cookie: log in f
 
 ### Authentication
 
-| Method | Path | Auth | Description |
+|Method|Path|Auth|Description|
 |---|---|---|---|
-| POST | `/api/auth/login` | public | Log in (`{"email","password"}`) |
-| POST | `/api/auth/logout` | any | Log out |
-| GET | `/api/auth/me` | any | Current user |
+|POST|`/api/auth/login`|public|Log in (`{"email","password"}`)|
+|POST|`/api/auth/logout`|any|Log out|
+|GET|`/api/auth/me`|any|Current user|
 
 ### User Accounts (User Admin)
 
-| Method | Path | Description |
+|Method|Path|Description|
 |---|---|---|
-| GET | `/api/users` | List all |
-| GET | `/api/users/search?q=` | Search by username/email |
-| POST | `/api/users` | Create |
-| GET | `/api/users/:id` | View |
-| PUT | `/api/users/:id` | Update |
-| PATCH | `/api/users/:id/suspend` | Suspend |
-| PATCH | `/api/users/:id/activate` | Activate |
+|GET|`/api/users`|List all|
+|GET|`/api/users/search?q=`|Search by username/email|
+|POST|`/api/users`|Create|
+|GET|`/api/users/:id`|View|
+|PUT|`/api/users/:id`|Update|
+|PATCH|`/api/users/:id/suspend`|Suspend|
+|PATCH|`/api/users/:id/activate`|Activate|
 
 ### User Profiles (User Admin)
 
-| Method | Path | Description |
+|Method|Path|Description|
 |---|---|---|
-| GET | `/api/profiles` | List all |
-| GET | `/api/profiles/search?q=` | Search by name |
-| POST | `/api/profiles` | Create |
-| GET | `/api/profiles/:id` | View |
-| PUT | `/api/profiles/:id` | Update |
-| PATCH | `/api/profiles/:id/suspend` | Suspend |
-| PATCH | `/api/profiles/:id/activate` | Activate |
+|GET|`/api/profiles`|List all|
+|GET|`/api/profiles/search?q=`|Search by name|
+|POST|`/api/profiles`|Create|
+|GET|`/api/profiles/:id`|View|
+|PUT|`/api/profiles/:id`|Update|
+|PATCH|`/api/profiles/:id/suspend`|Suspend|
+|PATCH|`/api/profiles/:id/activate`|Activate|
 
 ### Companies (Interior Designer)
 
-| Method | Path | Description |
+|Method|Path|Description|
 |---|---|---|
-| GET | `/api/companies` | List own companies |
-| GET | `/api/companies/search?q=` | Search own companies |
-| POST | `/api/companies` | Create (name, address and contact number are all required) |
-| GET | `/api/companies/:id` | View |
-| PUT | `/api/companies/:id` | Update |
-| DELETE | `/api/companies/:id` | Delete (400 if it still has projects) |
+|GET|`/api/companies`|List own companies|
+|GET|`/api/companies/search?q=`|Search own companies|
+|POST|`/api/companies`|Create (name, address and contact number are all required)|
+|GET|`/api/companies/:id`|View|
+|PUT|`/api/companies/:id`|Update|
+|DELETE|`/api/companies/:id`|Delete (blocked if it still has projects; currently returns 500, see Known Limitations)|
 
 ### Projects (Interior Designer)
 
-| Method | Path | Description |
+|Method|Path|Description|
 |---|---|---|
-| POST | `/api/projects` | Create ongoing project |
-| POST | `/api/projects/completed` | Create completed project |
-| GET | `/api/projects/search?q=&status=` | **US #24** — search own projects across all own companies |
-| GET | `/api/projects/search/interest` | View/save metrics for all own projects |
-| GET | `/api/projects/:id` | View |
-| GET | `/api/projects/:id/completed` | View completed |
-| PUT | `/api/projects/:id` | Update |
-| PUT | `/api/projects/:id/completed` | Update completed |
-| DELETE | `/api/projects/:id` | Delete |
-| DELETE | `/api/projects/:id/completed` | Delete completed |
-| GET | `/api/projects/company/:companyId` | List by company (`?status=` optional) |
-| GET | `/api/projects/company/:companyId/search?q=&status=` | **US #24** — search within one company |
-| GET | `/api/projects/company/:companyId/completed/search?q=` | **US #29** — search completed projects |
-| GET | `/api/projects/company/:companyId/interest` | Views/saves per project (US #37, #38) |
+|POST|`/api/projects`|Create ongoing project|
+|POST|`/api/projects/completed`|Create completed project|
+|GET|`/api/projects/search?q=&status=`|**US #24** — search own projects across all own companies|
+|GET|`/api/projects/search/interest`|View/save metrics for all own projects|
+|GET|`/api/projects/:id`|View|
+|GET|`/api/projects/:id/completed`|View completed|
+|PUT|`/api/projects/:id`|Update|
+|PUT|`/api/projects/:id/completed`|Update completed|
+|DELETE|`/api/projects/:id`|Delete|
+|DELETE|`/api/projects/:id/completed`|Delete completed|
+|GET|`/api/projects/company/:companyId`|List by company (`?status=` optional)|
+|GET|`/api/projects/company/:companyId/search?q=&status=`|**US #24** — search within one company|
+|GET|`/api/projects/company/:companyId/completed/search?q=`|**US #29** — search completed projects|
+|GET|`/api/projects/company/:companyId/interest`|Views/saves per project (US #37, #38)|
 
 A search with no matches returns **200** with `"projects": []` and a `message`, not an error.
 
 ### Public Projects (Customer)
 
-| Method | Path | Description |
+|Method|Path|Description|
 |---|---|---|
-| GET | `/api/projects/public/search?q=` | Search all public projects |
-| GET | `/api/projects/public/:id` | View and increment the view count |
+|GET|`/api/projects/public/search?q=`|Search all public projects|
+|GET|`/api/projects/public/:id`|View and increment the view count|
 
 ### Favourites (Customer)
 
-| Method | Path | Description |
+|Method|Path|Description|
 |---|---|---|
-| GET | `/api/favourites` | List own favourites |
-| GET | `/api/favourites/search?q=` | Search own favourites |
-| POST | `/api/favourites` | Save (`{"project_id": N}`; idempotent, 404 if project is missing) |
-| DELETE | `/api/favourites/:projectId` | Remove |
+|GET|`/api/favourites`|List own favourites|
+|GET|`/api/favourites/search?q=`|Search own favourites|
+|POST|`/api/favourites`|Save (`{"project_id": N}`; idempotent, 404 if project is missing)|
+|DELETE|`/api/favourites/:projectId`|Remove|
 
 ### Categories (Platform Manager)
 
-| Method | Path | Description |
+|Method|Path|Description|
 |---|---|---|
-| GET | `/api/categories` | List all |
-| GET | `/api/categories/search?q=` | Search by name |
-| GET | `/api/categories/:id` | View |
-| POST | `/api/categories` | Create |
-| PUT | `/api/categories/:id` | Update |
-| DELETE | `/api/categories/:id` | Delete |
+|GET|`/api/categories`|List all|
+|GET|`/api/categories/search?q=`|Search by name|
+|GET|`/api/categories/:id`|View|
+|POST|`/api/categories`|Create|
+|PUT|`/api/categories/:id`|Update|
+|DELETE|`/api/categories/:id`|Delete|
 
 ### Reports (Platform Manager)
 
-| Method | Path | Description |
+|Method|Path|Description|
 |---|---|---|
-| GET | `/api/reports/daily` | Last 24 hours summary |
-| GET | `/api/reports/weekly` | Last 7 days summary |
-| GET | `/api/reports/monthly` | Last 30 days summary |
+|GET|`/api/reports/daily`|Last 24 hours summary|
+|GET|`/api/reports/weekly`|Last 7 days summary|
+|GET|`/api/reports/monthly`|Last 30 days summary|
 
 Any other report type is rejected.
 
@@ -594,14 +600,14 @@ Every error returns a structured JSON payload:
 
 The frontend renders these as styled toasts.
 
-| Status | Meaning |
+|Status|Meaning|
 |---|---|
-| 400 | Missing or invalid input; record still in use |
-| 401 | Not logged in, or wrong credentials |
-| 403 | Wrong role, not the owner, or suspended account/profile |
-| 404 | Record or endpoint not found |
-| 409 | Duplicate (email, username, name) or already suspended |
-| 500 | Unexpected server error |
+|400|Missing or invalid input|
+|401|Not logged in, or wrong credentials|
+|403|Wrong role, not the owner, or suspended account/profile|
+|404|Record or endpoint not found|
+|409|Duplicate (email, username, name) or already suspended|
+|500|Unexpected server error, including a database constraint violation such as deleting a company that still has projects|
 
 ---
 
@@ -609,15 +615,15 @@ The frontend renders these as styled toasts.
 
 A suggested ~5-minute live walkthrough.
 
-*To show the Reports page with realistic data, run `php db/generate_test_data.php` beforehand.*
+_To show the Reports page with realistic data, run `php db/generate_test_data.php` beforehand._
 
 1. **Log in as admin** — the nav bar shows only admin modules (RBAC).
 2. **Log out, log in as `suspended@example.test`** — show the 403 error toast.
 3. **Log in as designer** — create a company, create a project, search projects (US #24), open the analytics (views and saves).
 4. **Log out, log in as customer** — browse the gallery, save a project to favourites, view the list, remove one.
 5. **Log out, log in as manager** — create a category, generate a daily and a weekly report.
-6. **Log in as designer, delete a company that has projects** — show the 400 error (`ON DELETE RESTRICT` protecting data).
-7. *(Optional)* Run `node demo.js` to show all 48 stories passing from the command line.
+6. **Log in as designer, delete a company that has projects** — the delete is refused and the company and its projects remain (`ON DELETE RESTRICT` protecting data). With the generated data, "Synthetic Company 1" holds all 100 projects. The error currently surfaces as a 500, not a 400.
+7. _(Optional)_ Run `node demo.js` to show all 48 stories passing from the command line.
 
 ---
 
@@ -625,39 +631,38 @@ A suggested ~5-minute live walkthrough.
 
 ### First-run errors
 
-| Symptom | Cause | Fix |
+|Symptom|Cause|Fix|
 |---|---|---|
-| `php` not recognised | PHP not on PATH | Add the PHP folder (e.g. `C:\xampp\php`) to the PATH via `sysdm.cpl` → Environment Variables. Reopen the shell. |
-| `could not find driver` | `pdo_pgsql` not enabled | In `php.ini` remove the `;` before `extension=pdo_pgsql`. Reopen the shell. |
-| `Class "PDO" not found` | `pdo` not enabled | Enable `extension=pdo` in `php.ini`. |
-| `SQLSTATE[08006] connection refused` | PostgreSQL not running | Start the service (Windows: `services.msc` → `postgresql-x64-15`; Linux: `sudo service postgresql start`). |
-| `password authentication failed` | Wrong password in `.env` | Set `DB_PASSWORD` to your real `postgres` password. |
-| `database "csit314_seven" does not exist` | Database not created | `psql -U postgres -c "CREATE DATABASE csit314_seven;"` |
-| `Port 8000 already in use` | Another process holds the port | Use another port: `php -S localhost:8001 router.php` (note: `demo.js` and the test bootstrap expect 8000). |
-| The lock file is not up to date with `composer.json` | `composer.lock` out of date | Harmless. Fix with `composer update`, then commit the new `composer.lock`. |
+|`php` not recognised|PHP not on PATH|Add the PHP folder (e.g. `C:\xampp\php`) to the PATH via `sysdm.cpl` → Environment Variables. Reopen the shell.|
+|`could not find driver`|`pdo_pgsql` not enabled|In `php.ini` remove the `;` before `extension=pdo_pgsql`. Reopen the shell.|
+|`Class "PDO" not found`|`pdo` not enabled|Enable `extension=pdo` in `php.ini`.|
+|`SQLSTATE[08006] connection refused`|PostgreSQL not running|Start the service (Windows: `services.msc` → `postgresql-x64-15`; Linux: `sudo service postgresql start`).|
+|`password authentication failed`|Wrong password in `.env`|Set `DB_PASSWORD` to your real `postgres` password.|
+|`database "csit314_seven" does not exist`|Database not created|`psql -U postgres -c "CREATE DATABASE csit314_seven;"`|
+|`Port 8000 already in use`|Another process holds the port|Use another port: `php -S localhost:8001 router.php` (note: `demo.js` and the test bootstrap expect 8000).|
+|The lock file is not up to date with `composer.json`|`composer.lock` out of date|Harmless. Fix with `composer update`, then commit the new `composer.lock`.|
 
 ### Runtime errors
 
-| Symptom | Cause | Fix |
+|Symptom|Cause|Fix|
 |---|---|---|
-| Stale behaviour after editing JS/CSS | Browser cache | Hard refresh: Ctrl + Shift + R |
-| Seeded login says "Invalid email or password" | Seed not run, or data wiped | `php db/seed.php` |
-| Lists are empty when they shouldn't be | Seed not run | `php db/seed.php` |
-| 403 on a page you should access | Wrong user logged in | Log out and log in with the correct role |
-| 500 on any page | Server-side exception | Look at the terminal running `php -S`; the error log names the file and line |
+|Stale behaviour after editing JS/CSS|Browser cache|Hard refresh: Ctrl + Shift + R|
+|Seeded login says "Invalid email or password"|Seed not run, or data wiped|`php db/seed.php`|
+|Lists are empty when they shouldn't be|Seed not run|`php db/seed.php`|
+|403 on a page you should access|Wrong user logged in|Log out and log in with the correct role|
+|500 on any page|Server-side exception|Look at the terminal running `php -S`; the error log names the file and line|
 
 ### Testing and `demo.js`
 
-| Symptom | Fix |
+|Symptom|Fix|
 |---|---|
-| `Error: Cannot find module '...\demo.js'` | You are in the wrong folder. `cd` into the project folder (the one containing `demo.js`) first. Check with `dir` / `ls`. |
-| `demo.js`: `fetch failed` / `ECONNREFUSED` | The server is not running. Start `php -S localhost:8000 router.php` in another terminal. |
-| `demo.js`: nearly every story shows ❌ | Database is down or not seeded. Check PostgreSQL is running, then `php db/seed.php`. |
-| One story shows ❌ | Run that endpoint with `curl`, and check the `php -S` terminal for the error line. |
-| `vendor\bin\phpunit` not found | Run `composer install`; PHPUnit lives in `vendor/`. |
-| `Could not connect to localhost:8000` in tests | The bootstrap normally starts a server. If it fails, start one manually in another window. |
-| Tests fail on the `ON DELETE RESTRICT` assertion | The schema is old. Re-run `psql -U postgres -d csit314_seven -f db/schema.sql` and re-seed. |
-| `node` not recognised | Install Node.js 18+ (only needed for `demo.js`). |
+|`Error: Cannot find module '...\demo.js'`|You are in the wrong folder. `cd` into the project folder (the one containing `demo.js`) first. Check with `dir` / `ls`.|
+|`demo.js`: `fetch failed` / `ECONNREFUSED`|The server is not running. Start `php -S localhost:8000 router.php` in another terminal.|
+|`demo.js`: nearly every story shows ❌|Database is down or not seeded. Check PostgreSQL is running, then `php db/seed.php`.|
+|One story shows ❌|Run that endpoint with `curl`, and check the `php -S` terminal for the error line.|
+|`vendor\bin\phpunit` not found|Run `composer install`; PHPUnit lives in `vendor/`.|
+|`Could not connect to localhost:8000` in tests|The bootstrap normally starts a server. If it fails, start one manually in another window.|
+|`node` not recognised|Install Node.js 18+ (only needed for `demo.js`).|
 
 ---
 
@@ -670,6 +675,13 @@ Documented honestly so they are not mistaken for oversights:
 - **Search treats `%` and `_` as wildcards** (they are not escaped before `ILIKE`).
 - **Session cookie lacks the `Secure` flag.** It should be enabled when deployed over HTTPS.
 - **Built-in PHP server.** `php -S` is for development and demos, not production.
+- **Deleting a company that still has projects returns HTTP 500.** The foreign-key constraint correctly blocks the delete, but the controller's catch-all error handler reports it as a server error instead of a 400.
+- **Error handler exposes internal details.** `handle_error()` is a debug version: it returns the raw exception message (and file/line) to the client. Switch it to a generic message before any real deployment.
+- **Single-record reads are not ownership-checked.** `GET /api/companies/:id` and `GET /api/projects/:id` return the record to any logged-in designer who knows the ID. Writes, deletes and the per-company list/search are ownership-checked.
+- **Every public project view is counted.** `project_view` gets a new row on each view, so one customer opening a project repeatedly raises its view count each time. There is no per-customer de-duplication.
+- **Reports use rolling windows.** Daily = last 24 hours, weekly = last 7 days, monthly = last 30 days, not calendar periods.
+- **Result caps.** The admin user search, a designer's company search and the customer's public project search return at most 100 rows, and a designer's own-project search at most 200. There is no pagination. With the generated data (about 105 users, about 104 projects) the admin and customer lists therefore stop at 100.
+- **Not covered by automated tests:** the delete-company-with-projects path, and the ownership gaps above.
 
 ---
 
@@ -692,13 +704,13 @@ If the pipeline is red, do not merge. A green run is the entry criterion for rev
 
 ## Team
 
-| Name | Student ID |
+|Name|Student ID|
 |---|---|
-| Sharan Saravana | 1104809 |
-| Toh Yong Jie | 1105243 |
-| Lee Hongyi, Ryan | 1124535 |
-| Marvin Fong Jun Lin | 1124596 |
-| Chiw Jia Long | 1137438 |
+|Sharan Saravana|1104809|
+|Toh Yong Jie|1105243|
+|Lee Hongyi, Ryan|1124535|
+|Marvin Fong Jun Lin|1124596|
+|Chiw Jia Long|1137438|
 
 ---
 
