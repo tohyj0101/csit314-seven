@@ -11,6 +11,25 @@ declare(strict_types=1);
  * =============================================================================
  */
 
+
+/**
+ * =============================================================================
+ * AppError
+ * =============================================================================
+ * Thrown by the ENTITY layer when a business rule fails (invalid input,
+ * not found, not the owner, duplicate...). It carries the HTTP status, the
+ * user-facing message and optional extra context (e.g. ['field' => 'email']).
+ * Router::dispatch() catches it and renders it with display_error().
+ * =============================================================================
+ */
+class AppError extends RuntimeException
+{
+    public function __construct(public int $status, string $message, public array $context = [])
+    {
+        parent::__construct($message);
+    }
+}
+
 class Router
 {
     /** @var array<int, array{0:string,1:string,2:array,3:callable}> */
@@ -44,8 +63,16 @@ class Router
                 if ($fn() === false) return; 
             }
             
-            // Execute the Controller method
-            $handler($params);
+            // Execute the Controller method. Entities signal business-rule failures
+            // by throwing AppError (status + message); we turn that into the
+            // structured JSON error here, so controllers never have to.
+            try {
+                $handler($params);
+            } catch (AppError $e) {
+                display_error($e->status, $e->getMessage(), $e->context);
+            } catch (Throwable $e) {
+                handle_error($e);
+            }
             return;
         }
 
@@ -106,11 +133,31 @@ function session_user(): ?array
 
 /**
  * Emits a JSON response with the given HTTP status code.
- * Note: For errors, controllers now use `display_error()` instead of `json_out()`.
+ * Note: errors are rendered with `display_error()` (see below).
  */
 function json_out(int $status, array $payload): void
 {
     http_response_code($status);
     header('Content-Type: application/json');
     echo json_encode($payload);
+}
+
+/**
+ * Renders a structured JSON error (used by the router and the middleware guards).
+ */
+function display_error(int $status, string $message, array $context = []): void {
+    $meta = [400 => ['title' => 'Invalid Input', 'severity' => 'warning', 'icon' => '⚠️'], 401 => ['title' => 'Login Required', 'severity' => 'warning', 'icon' => '🔒'], 403 => ['title' => 'Access Denied', 'severity' => 'error', 'icon' => '⛔'], 404 => ['title' => 'Not Found', 'severity' => 'info', 'icon' => '🔍'], 409 => ['title' => 'Conflict', 'severity' => 'warning', 'icon' => '⚡'], 422 => ['title' => 'Validation Failed', 'severity' => 'warning', 'icon' => '⚠️'], 500 => ['title' => 'Server Error', 'severity' => 'critical', 'icon' => '💥']];
+    $m = $meta[$status] ?? ['title' => 'Error', 'severity' => 'error', 'icon' => '❌'];
+    $safeMessage = htmlspecialchars($message, ENT_QUOTES, 'UTF-8');
+    $payload = array_merge(['error' => $message, 'message' => $message, 'title' => $m['title'], 'severity' => $m['severity'], 'icon' => $m['icon'], 'status' => $status, 'display' => true, 'html' => '<div class="error-alert" data-severity="' . $m['severity'] . '" data-status="' . $status . '" role="alert"><span class="error-alert__icon" aria-hidden="true">' . $m['icon'] . '</span><div class="error-alert__body"><strong class="error-alert__title">' . $m['title'] . '</strong><p class="error-alert__message">' . $safeMessage . '</p></div></div>'], $context);
+    json_out($status, $payload);
+}
+
+// DEBUG VERSION: Outputs exact error to Node console
+function handle_error(Throwable $e, string $fallback = 'An unexpected system error occurred. Please try again later.'): void {
+    json_out(500, [
+        'error' => $e->getMessage(),
+        'line' => $e->getLine(),
+        'file' => basename($e->getFile())
+    ]);
 }

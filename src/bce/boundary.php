@@ -66,19 +66,6 @@ $r->get('/categories/:id', [$auth, $M], fn($p) => ViewCategoryController::retrie
 $r->put('/categories/:id', [$auth, $M], fn($p) => UpdateCategoryController::updateCategory($p));
 $r->delete('/categories/:id', [$auth, $M], fn($p) => DeleteCategoryController::deleteCategory($p));
 /**Manager Report Generation */
-$r->get('/reports/:type', [$auth, $M], function (array $p) {
-    $type = strtolower((string)($p['type'] ?? ''));
-    switch ($type) {
-        case 'daily':   DailyReportController::generateDailyReport();     return;
-        case 'weekly':  WeeklyReportController::generateWeeklyReport();   return;
-        case 'monthly': MonthlyReportController::generateMonthlyReport(); return;
-    }
-    // Invalid report type, e.g. /api/reports/yearly
-    display_error(
-        400,
-        'Invalid report type. Expected daily, weekly or monthly.',
-        ['type' => $type, 'allowed' => ['daily', 'weekly', 'monthly']]
-    );
-});
+$r->get('/reports/:type', [$auth, $M], fn($p) => ReportController::generate($p));
 
 return $r;

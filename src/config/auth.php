@@ -36,3 +36,33 @@ function verify_password(string $plain, string $hash): bool
 {
     return password_verify($plain, $hash);
 }
+
+/**
+ * =============================================================================
+ * SESSION HELPERS
+ * =============================================================================
+ */
+
+/**
+ * Starts an authenticated session for the given user (already shaped as
+ * account_id / username / role / permissions) and returns it.
+ */
+function session_login(array $user): array
+{
+    session_regenerate_id(true); // prevents session fixation
+    $_SESSION['user'] = $user;
+    return $_SESSION['user'];
+}
+
+/**
+ * Ends the current session and expires its cookie.
+ */
+function session_logout(): void
+{
+    $_SESSION = [];
+    if (ini_get('session.use_cookies')) {
+        $p = session_get_cookie_params();
+        setcookie(session_name(), '', time() - 42000, $p['path'], $p['domain'], $p['secure'], $p['httponly']);
+    }
+    session_destroy();
+}
