@@ -1,6 +1,6 @@
 # CSIT314 T04: Seven — Interior Designer Matching Platform
 
-[CI](https://github.com/tohyj0101/csit314-seven/actions/workflows/ci.yml)
+[![CI](https://github.com/tohyj0101/csit314-seven/actions/workflows/ci.yml/badge.svg)](https://github.com/tohyj0101/csit314-seven/actions/workflows/ci.yml)
 
 A full-stack web platform that connects renovation customers with interior designers. Built with PHP, PostgreSQL and a vanilla JavaScript front end on a Boundary–Control–Entity (BCE) architecture, following Agile/Scrum with CI/CD and integration testing.
 
@@ -10,24 +10,24 @@ A full-stack web platform that connects renovation customers with interior desig
 
 ## Table of Contents
 
-1. [Quick Start](https://claude.ai/chat/0e56f8f6-69f3-47be-883b-af485f9a5e6c#quick-start)
-2. [Overview](https://claude.ai/chat/0e56f8f6-69f3-47be-883b-af485f9a5e6c#overview)
-3. [Features by Role](https://claude.ai/chat/0e56f8f6-69f3-47be-883b-af485f9a5e6c#features-by-role)
-4. [Tech Stack](https://claude.ai/chat/0e56f8f6-69f3-47be-883b-af485f9a5e6c#tech-stack)
-5. [Architecture](https://claude.ai/chat/0e56f8f6-69f3-47be-883b-af485f9a5e6c#architecture)
-6. [Prerequisites](https://claude.ai/chat/0e56f8f6-69f3-47be-883b-af485f9a5e6c#prerequisites)
-7. [Full Setup Guide](https://claude.ai/chat/0e56f8f6-69f3-47be-883b-af485f9a5e6c#full-setup-guide)
-8. [Test Credentials](https://claude.ai/chat/0e56f8f6-69f3-47be-883b-af485f9a5e6c#test-credentials)
-9. [Testing](https://claude.ai/chat/0e56f8f6-69f3-47be-883b-af485f9a5e6c#testing)
-10. [Project Structure](https://claude.ai/chat/0e56f8f6-69f3-47be-883b-af485f9a5e6c#project-structure)
-11. [Database](https://claude.ai/chat/0e56f8f6-69f3-47be-883b-af485f9a5e6c#database)
-12. [API Endpoints](https://claude.ai/chat/0e56f8f6-69f3-47be-883b-af485f9a5e6c#api-endpoints)
-13. [Manual Demo Script](https://claude.ai/chat/0e56f8f6-69f3-47be-883b-af485f9a5e6c#manual-demo-script)
-14. [Troubleshooting](https://claude.ai/chat/0e56f8f6-69f3-47be-883b-af485f9a5e6c#troubleshooting)
-15. [Known Limitations](https://claude.ai/chat/0e56f8f6-69f3-47be-883b-af485f9a5e6c#known-limitations)
-16. [CI/CD](https://claude.ai/chat/0e56f8f6-69f3-47be-883b-af485f9a5e6c#cicd)
-17. [Team](https://claude.ai/chat/0e56f8f6-69f3-47be-883b-af485f9a5e6c#team)
-18. [Academic Context](https://claude.ai/chat/0e56f8f6-69f3-47be-883b-af485f9a5e6c#academic-context)
+1. [Quick Start](#quick-start)
+2. [Overview](#overview)
+3. [Features by Role](#features-by-role)
+4. [Tech Stack](#tech-stack)
+5. [Architecture](#architecture)
+6. [Prerequisites](#prerequisites)
+7. [Full Setup Guide](#full-setup-guide)
+8. [Test Credentials](#test-credentials)
+9. [Testing](#testing)
+10. [Project Structure](#project-structure)
+11. [Database](#database)
+12. [API Endpoints](#api-endpoints)
+13. [Manual Demo Script](#manual-demo-script)
+14. [Troubleshooting](#troubleshooting)
+15. [Known Limitations](#known-limitations)
+16. [CI/CD](#cicd)
+17. [Team](#team)
+18. [Academic Context](#academic-context)
 
 ---
 
@@ -81,7 +81,7 @@ The platform serves four user roles, each with its own permissions and workflow:
 Access control is enforced at two levels:
 
 - **Route level** — the boundary layer rejects requests from the wrong role (`403 Forbidden`). Each route is wrapped in `auth_guard()` (must be logged in) and `role_guard('<Role>')` (must hold the required profile).
-- **Resource level** — controllers verify ownership before changing anything. For example, a designer cannot edit another designer's company or project, and cannot list another designer's company's projects (403). Ownership is enforced on writes and on list/search endpoints; reading a single record by ID is not ownership-checked (see [Known Limitations](https://claude.ai/chat/0e56f8f6-69f3-47be-883b-af485f9a5e6c#known-limitations)).
+- **Resource level** — the entity layer verifies ownership before changing anything. For example, a designer cannot edit another designer's company or project, and cannot list another designer's company's projects (403). Ownership is enforced on writes and on list/search endpoints; reading a single record by ID is not ownership-checked (see [Known Limitations](#known-limitations)).
 
 ### Role → route matrix
 
@@ -152,7 +152,7 @@ Browser  ───────►  Boundary Layer   public/js/app.js
                           │
                           ▼
                     Control Layer   src/bce/controllers.php
-                    41 controllers (+ ProjectAuth helper)
+                    42 controllers (pass-through only)
                           │
                           ▼
                     Entity Layer    src/bce/entities.php
@@ -163,8 +163,8 @@ Browser  ───────►  Boundary Layer   public/js/app.js
 ```
 
 - **Boundary** (`src/bce/boundary.php`) — maps 50 HTTP routes to controllers and attaches the middleware (`auth_guard()`, `role_guard()`).
-- **Control** (`src/bce/controllers.php`) — validates input, enforces ownership, picks the HTTP status, and delegates to entities.
-- **Entity** (`src/bce/entities.php`) — `UserAcc`, `UserProfile`, `CompanyInfo`, `Project`, `Favourite`, `Category`, `Report`. All SQL lives here.
+- **Control** (`src/bce/controllers.php`) — pass-through only. Each controller hands the request data (body, URL parameters, query string, session user id) to one entity method and returns the JSON it gets back. It contains no validation, no ownership checks, no SQL and no error handling.
+- **Entity** (`src/bce/entities.php`) — `UserAcc`, `UserProfile`, `CompanyInfo`, `Project`, `Favourite`, `Category`, `Report`. Holds the business rules (validation, ownership, duplicate checks) and all the SQL. A failed rule is thrown as an `AppError` carrying the HTTP status and message.
 - **Frontend** (`public/js/app.js`) — single-page app that treats the backend as a REST API.
 
 ### Request lifecycle
@@ -173,15 +173,16 @@ Browser  ───────►  Boundary Layer   public/js/app.js
 2. `router.php` serves static files directly and hands every other request to `public/index.php`, which loads `src/bootstrap.php` (`.env`, session, classes) and the route table in `src/bce/boundary.php`.
 3. `Router::dispatch()` matches the method and path (e.g. `/projects/company/:companyId`) and extracts named parameters.
 4. Middleware runs in order. `auth_guard()` returns `401` if there is no session. `role_guard()` returns `403` for the wrong role.
-5. The controller validates input and checks ownership, then calls an entity method.
-6. The entity runs a parameterised query through `q()`, `q1()` or `ex()` in `src/config/db.php`.
-7. The controller returns JSON through `json_out()` or `display_error()`.
+5. The controller passes the request data to one entity method.
+6. The entity validates the input, checks ownership, and runs parameterised queries through `q()`, `q1()` or `ex()` in `src/config/db.php`. If a rule fails it throws `AppError(status, message)`.
+7. The controller returns the entity's result as JSON through `json_out()`. If an `AppError` (or any other exception) was thrown, `Router::dispatch()` catches it and renders it through `display_error()`.
 
 ### Design notes
 
 - **Custom router.** Express-style paths (`/users/:id`) are converted to regular expressions. Routes are matched in the order they are registered, so fixed paths such as `/projects/search` must be registered **before** `/projects/:id`.
 - **`$1, $2` placeholders.** SQL is written with PostgreSQL-style `$n` placeholders. `db_prepare()` translates them to PDO `?` placeholders and reorders the parameters, so a placeholder can be reused in one query. Every query is a prepared statement.
-- **Structured errors.** Controllers report problems through `display_error()` so the frontend can show consistent banners (see [Error Responses](https://claude.ai/chat/0e56f8f6-69f3-47be-883b-af485f9a5e6c#error-responses)).
+- **Structured errors.** Entities throw `AppError`; `Router::dispatch()` renders it through `display_error()` so the frontend can show consistent banners (see [Error Responses](#error-responses)).
+- **Thin controllers.** Controllers only relay. To change a rule (for example the 8-digit contact number check), edit the entity method, not the controller.
 - **Ownership before search.** The per-company search checks company ownership first and returns `403` for a company the caller does not own. A company you own with no matching projects returns `200` with an empty list.
 
 ---
@@ -402,9 +403,9 @@ csit314-seven/
 │
 ├── src/
 │   ├── bootstrap.php           # Loads config, classes, .env, session
-│   ├── Router.php              # Route matching + helpers (json_out, req_body, session_user)
+│   ├── Router.php              # Route matching, AppError, display_error / handle_error, helpers (json_out, req_body, session_user)
 │   ├── config/
-│   │   ├── auth.php            # hash_password / verify_password (bcrypt)
+│   │   ├── auth.php            # hash_password / verify_password (bcrypt), session_login / session_logout
 │   │   ├── db.php              # PDO singleton + q(), q1(), ex()
 │   │   └── env.php             # .env loader
 │   ├── middleware/
@@ -412,8 +413,8 @@ csit314-seven/
 │   │   └── roleGuard.php       # role_guard()  → 403
 │   └── bce/
 │       ├── boundary.php        # All 50 routes
-│       ├── controllers.php     # 41 controllers + ProjectAuth helper
-│       └── entities.php        # 7 entity classes
+│       ├── controllers.php     # 42 pass-through controllers
+│       └── entities.php        # 7 entity classes: business rules + all SQL
 │
 ├── public/
 │   ├── index.html              # SPA shell
@@ -447,7 +448,7 @@ PostgreSQL, 8 tables.
 
 **Delete behaviour**
 
-- Deleting a **company that has projects** is blocked by the database (`ON DELETE RESTRICT`), so no data is lost. The API currently reports this as **HTTP 500** with the database error text, not a friendly 400 (see [Known Limitations](https://claude.ai/chat/0e56f8f6-69f3-47be-883b-af485f9a5e6c#known-limitations)).
+- Deleting a **company that has projects** is blocked by the database (`ON DELETE RESTRICT`), so no data is lost. The API currently reports this as **HTTP 500** with the database error text, not a friendly 400 (see [Known Limitations](#known-limitations)).
 - Deleting a **project** removes its views, favourites and category links (`CASCADE`).
 - Deleting a **customer account** removes their favourites and anonymises their views (`SET NULL`).
 
@@ -675,7 +676,7 @@ Documented honestly so they are not mistaken for oversights:
 - **Search treats `%` and `_` as wildcards** (they are not escaped before `ILIKE`).
 - **Session cookie lacks the `Secure` flag.** It should be enabled when deployed over HTTPS.
 - **Built-in PHP server.** `php -S` is for development and demos, not production.
-- **Deleting a company that still has projects returns HTTP 500.** The foreign-key constraint correctly blocks the delete, but the controller's catch-all error handler reports it as a server error instead of a 400.
+- **Deleting a company that still has projects returns HTTP 500.** The foreign-key constraint correctly blocks the delete, but the router's catch-all error handler (`Router::dispatch`) reports it as a server error instead of a 400.
 - **Error handler exposes internal details.** `handle_error()` is a debug version: it returns the raw exception message (and file/line) to the client. Switch it to a generic message before any real deployment.
 - **Single-record reads are not ownership-checked.** `GET /api/companies/:id` and `GET /api/projects/:id` return the record to any logged-in designer who knows the ID. Writes, deletes and the per-company list/search are ownership-checked.
 - **Every public project view is counted.** `project_view` gets a new row on each view, so one customer opening a project repeatedly raises its view count each time. There is no per-customer de-duplication.
